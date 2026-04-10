@@ -1,3 +1,7 @@
+.token
+.device
+.copilot
+
 # Logs
 logs
 *.log
