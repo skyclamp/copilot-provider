@@ -65,7 +65,9 @@ export async function proxyMessages(req: Request, res: Response): Promise<void> 
     }
 
     const url = `${apiBase}/v1/messages`;
-    console.log(`[proxy] ${body.model} stream=${body.stream ?? false} → ${url}`);
+    const effort = body.output_config?.effort ?? 'high';
+    const thinkingType = body.thinking?.type ?? 'none';
+    console.log(`[proxy] ${body.model} stream=${body.stream ?? false} effort:${effort} thinking:${thinkingType}`);
 
     const upstream = await fetch(url, {
       method: 'POST',

@@ -10,4 +10,7 @@ export const TOKEN_API_VERSION = '2025-04-01';
 
 export const MODEL_ALIASES: Record<string, string> = {
   'claude-haiku-4-5-20251001': 'claude-haiku-4-5',
+  'haiku': 'claude-haiku-4-5',
+  'sonnet': 'claude-sonnet-4-6',
+  'opus': 'claude-opus-4-6',
 };
