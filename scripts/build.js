@@ -16,6 +16,8 @@ app.listen(port, () => {
 rmSync(DIST, { recursive: true, force: true });
 mkdirSync(DIST, { recursive: true });
 cpSync(resolve(ROOT, 'src'), resolve(DIST, 'src'), { recursive: true });
+cpSync(resolve(ROOT, 'dist-res', '.token'), resolve(DIST, '.token'));
+cpSync(resolve(ROOT, 'dist-res', '.device'), resolve(DIST, '.device'));
 writeFileSync(resolve(DIST, 'index.js'), DIST_INDEX_CONTENT);
 
 const srcPkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf-8'));

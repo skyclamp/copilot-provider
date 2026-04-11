@@ -10,6 +10,8 @@ export async function proxyMessages(req, res) {
       body.model = mapModel(body.model);
     }
 
+    headers['anthropic-beta'] = req.headers['anthropic-beta'];
+
     const outputConfig = isRecord(body.output_config) ? body.output_config : null;
     const thinking = isRecord(body.thinking) ? body.thinking : null;
     const effort = typeof outputConfig?.effort === 'string' ? outputConfig.effort : 'high';
