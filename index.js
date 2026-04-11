@@ -1,4 +1,5 @@
-import app from './src/server';
+import 'dotenv/config';
+import app from './src/server.js';
 
 const port = parseInt(process.env.PORT || '4141', 10);
 

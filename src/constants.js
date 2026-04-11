@@ -8,7 +8,7 @@ export const DEFAULT_COPILOT_API_BASE_URL = 'https://api.githubcopilot.com';
 // API version for the token exchange endpoint (api.github.com)
 export const TOKEN_API_VERSION = '2025-04-01';
 
-export const MODEL_ALIASES: Record<string, string> = {
+export const MODEL_ALIASES = {
   'claude-haiku-4-5-20251001': 'claude-haiku-4-5',
   'haiku': 'claude-haiku-4-5',
   'sonnet': 'claude-sonnet-4-6',

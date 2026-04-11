@@ -1,11 +1,10 @@
 import { Readable } from 'node:stream';
-import type { Request, Response } from 'express';
-import { forwardUpstreamHeaders, getProxyContext, isRecord, mapModel } from './proxy';
+import { forwardUpstreamHeaders, getProxyContext, isRecord, mapModel } from './proxy.js';
 
-export async function proxyMessages(req: Request, res: Response): Promise<void> {
+export async function proxyMessages(req, res) {
   try {
     const { apiBase, headers } = await getProxyContext();
-    const body = { ...(req.body as Record<string, unknown>) };
+    const body = isRecord(req.body) ? { ...req.body } : {};
 
     if (typeof body.model === 'string') {
       body.model = mapModel(body.model);
@@ -37,7 +36,7 @@ export async function proxyMessages(req: Request, res: Response): Promise<void> 
 
     if (upstream.body) {
       res.flushHeaders();
-      const readable = Readable.fromWeb(upstream.body as any);
+      const readable = Readable.fromWeb(upstream.body);
       readable.pipe(res);
       return;
     }

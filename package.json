@@ -1,21 +1,19 @@
 {
   "name": "copilot-provider",
-  "module": "index.ts",
+  "main": "index.js",
   "type": "module",
   "private": true,
   "scripts": {
-    "start": "bun run index.ts",
-    "build": "bun run scripts/build.ts",
-    "auth": "bun run scripts/auth.ts",
-    "setup-device": "bun run scripts/setup-device.ts"
+    "start": "node index.js",
+    "build": "node scripts/build.js",
+    "auth": "node scripts/auth.js",
+    "setup-device": "node scripts/setup-device.js"
   },
-  "devDependencies": {
-    "@types/bun": "latest",
-    "@types/express": "^5",
-    "@types/node": "^25.6.0",
-    "typescript": "^6.0.2"
+  "engines": {
+    "node": ">=20"
   },
   "dependencies": {
+    "dotenv": "^17.4.1",
     "express": "^5.2.1"
   }
 }

@@ -1,27 +1,12 @@
-import type { Request, Response } from 'express';
-import { SUPPORTED_EMBEDDING_MODEL } from './constants';
-import { forwardUpstreamIds, getProxyContext, isRecord } from './proxy';
-
-interface OpenAIErrorShape {
-  error: {
-    message: string;
-    type: string;
-    param: string | null;
-    code: string | null;
-  };
-}
-
-interface EmbeddingsUsage {
-  prompt_tokens: number;
-  total_tokens: number;
-}
+import { SUPPORTED_EMBEDDING_MODEL } from './constants.js';
+import { forwardUpstreamIds, getProxyContext, isRecord } from './proxy.js';
 
 function createOpenAIError(
-  message: string,
-  param: string | null,
-  code: string | null,
+  message,
+  param,
+  code,
   type = 'invalid_request_error',
-): OpenAIErrorShape {
+) {
   return {
     error: {
       message,
@@ -33,17 +18,17 @@ function createOpenAIError(
 }
 
 function sendOpenAIError(
-  res: Response,
-  status: number,
-  message: string,
-  param: string | null,
-  code: string | null,
+  res,
+  status,
+  message,
+  param,
+  code,
   type = 'invalid_request_error',
-): void {
+) {
   res.status(status).json(createOpenAIError(message, param, code, type));
 }
 
-function normalizeEmbeddingsInput(input: unknown): string[] | null {
+function normalizeEmbeddingsInput(input) {
   if (typeof input === 'string') {
     return input.length > 0 ? [input] : null;
   }
@@ -56,10 +41,10 @@ function normalizeEmbeddingsInput(input: unknown): string[] | null {
     return null;
   }
 
-  return input as string[];
+  return input;
 }
 
-function normalizeEmbeddingsDimensions(value: unknown): number | undefined | null {
+function normalizeEmbeddingsDimensions(value) {
   if (value === undefined) {
     return undefined;
   }
@@ -71,10 +56,10 @@ function normalizeEmbeddingsDimensions(value: unknown): number | undefined | nul
   return value;
 }
 
-function parseUpstreamError(body: string, status: number): OpenAIErrorShape {
+function parseUpstreamError(body, status) {
   if (body) {
     try {
-      const parsed = JSON.parse(body) as unknown;
+      const parsed = JSON.parse(body);
       if (isRecord(parsed) && isRecord(parsed.error) && typeof parsed.error.message === 'string') {
         return createOpenAIError(
           parsed.error.message,
@@ -100,7 +85,7 @@ function parseUpstreamError(body: string, status: number): OpenAIErrorShape {
   );
 }
 
-function normalizeEmbeddingItem(item: unknown, index: number): Record<string, unknown> | null {
+function normalizeEmbeddingItem(item, index) {
   if (isRecord(item) && Array.isArray(item.embedding)) {
     return {
       ...item,
@@ -120,7 +105,7 @@ function normalizeEmbeddingItem(item: unknown, index: number): Record<string, un
   return null;
 }
 
-function normalizeEmbeddingsResponse(body: unknown): Record<string, unknown> | null {
+function normalizeEmbeddingsResponse(body) {
   if (!isRecord(body)) {
     return null;
   }
@@ -137,13 +122,13 @@ function normalizeEmbeddingsResponse(body: unknown): Record<string, unknown> | n
 
   const data = rawData
     .map((item, index) => normalizeEmbeddingItem(item, index))
-    .filter((item): item is Record<string, unknown> => item !== null);
+    .filter((item) => item !== null);
 
   if (data.length !== rawData.length) {
     return null;
   }
 
-  const response: Record<string, unknown> = {
+  const response = {
     object: 'list',
     data,
     model: SUPPORTED_EMBEDDING_MODEL,
@@ -156,14 +141,14 @@ function normalizeEmbeddingsResponse(body: unknown): Record<string, unknown> | n
       response.usage = {
         prompt_tokens: promptTokens,
         total_tokens: totalTokens,
-      } as EmbeddingsUsage;
+      };
     }
   }
 
   return response;
 }
 
-export async function proxyEmbeddings(req: Request, res: Response): Promise<void> {
+export async function proxyEmbeddings(req, res) {
   const body = isRecord(req.body) ? req.body : {};
 
   if (typeof body.model !== 'string' || body.model.length === 0) {
@@ -236,7 +221,7 @@ export async function proxyEmbeddings(req: Request, res: Response): Promise<void
 
   try {
     const { apiBase, headers } = await getProxyContext();
-    const upstreamBody: Record<string, unknown> = {
+    const upstreamBody = {
       input: normalizedInput,
       model: body.model,
     };
@@ -265,7 +250,7 @@ export async function proxyEmbeddings(req: Request, res: Response): Promise<void
     }
 
     const rawBody = await upstream.text();
-    let parsedBody: unknown;
+    let parsedBody;
     try {
       parsedBody = rawBody ? JSON.parse(rawBody) : null;
     } catch {

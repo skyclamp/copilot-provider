@@ -1,38 +1,28 @@
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { readFile, access } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
-import type { Response } from 'express';
-import { getCopilotToken, getCopilotApiBaseUrl } from './copilot-token';
-import { MODEL_ALIASES } from './constants';
+import { fileURLToPath } from 'node:url';
+import { getCopilotToken, getCopilotApiBaseUrl } from './copilot-token.js';
+import { MODEL_ALIASES } from './constants.js';
 
-const DEVICE_FILE = resolve(__dirname ?? import.meta.dir, '..', '.device');
+const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
+const DEVICE_FILE = resolve(MODULE_DIR, '..', '.device');
 
-interface DeviceInfo {
-  vscodeSessionId: string;
-  vscodeMachineId: string;
-  editorDeviceId: string;
-}
+let deviceInfo = null;
 
-export interface ProxyContext {
-  apiBase: string;
-  headers: Record<string, string>;
-}
-
-let deviceInfo: DeviceInfo | null = null;
-
-async function getDeviceInfo(): Promise<DeviceInfo> {
+async function getDeviceInfo() {
   if (deviceInfo) return deviceInfo;
   try {
     await access(DEVICE_FILE);
   } catch {
-    throw new Error(`.device not found. Run: bun run scripts/setup-device.ts`);
+    throw new Error('.device not found. Run: bun run scripts/setup-device.js');
   }
   const content = await readFile(DEVICE_FILE, 'utf-8');
   deviceInfo = JSON.parse(content);
-  return deviceInfo!;
+  return deviceInfo;
 }
 
-function buildHeaders(copilotToken: string, device: DeviceInfo): Record<string, string> {
+function buildHeaders(copilotToken, device) {
   const chatVersion = process.env.COPILOT_CHAT_VERSION || '0.41.2';
   const vscodeVersion = process.env.VSCODE_VERSION || '1.113.0';
   const apiVersion = process.env.GITHUB_API_VERSION || '2025-10-01';
@@ -54,15 +44,15 @@ function buildHeaders(copilotToken: string, device: DeviceInfo): Record<string, 
   };
 }
 
-export function mapModel(model: string): string {
+export function mapModel(model) {
   return MODEL_ALIASES[model] || model;
 }
 
-export function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value) {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export async function getProxyContext(): Promise<ProxyContext> {
+export async function getProxyContext() {
   const tokenResponse = await getCopilotToken();
   const device = await getDeviceInfo();
   return {
@@ -71,7 +61,7 @@ export async function getProxyContext(): Promise<ProxyContext> {
   };
 }
 
-export function forwardUpstreamIds(upstream: globalThis.Response, res: Response): void {
+export function forwardUpstreamIds(upstream, res) {
   const requestId = upstream.headers.get('x-request-id');
   if (requestId) {
     res.setHeader('x-request-id', requestId);
@@ -83,7 +73,7 @@ export function forwardUpstreamIds(upstream: globalThis.Response, res: Response)
   }
 }
 
-export function forwardUpstreamHeaders(upstream: globalThis.Response, res: Response): void {
+export function forwardUpstreamHeaders(upstream, res) {
   forwardUpstreamIds(upstream, res);
   const contentType = upstream.headers.get('content-type');
   if (contentType) {

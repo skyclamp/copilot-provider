@@ -1,43 +1,27 @@
 /**
  * GitHub Device Flow OAuth — run once to generate .token
  *
- * Usage: bun run scripts/auth.ts
+ * Usage: bun run scripts/auth.js
  */
 
-import { resolve } from 'node:path';
-import { chmod } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { chmod, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import {
   GITHUB_DEVICE_CODE_URL,
   GITHUB_ACCESS_TOKEN_URL,
   GITHUB_CLIENT_ID,
   GITHUB_SCOPE,
-} from '../src/constants';
+} from '../src/constants.js';
 
-const TOKEN_FILE = resolve(import.meta.dir, '../.token');
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
+const TOKEN_FILE = resolve(SCRIPT_DIR, '../.token');
 
-function sleep(ms: number): Promise<void> {
+function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-interface DeviceFlowResponse {
-  device_code: string;
-  user_code: string;
-  verification_uri: string;
-  verification_uri_complete?: string;
-  expires_in: number;
-  interval: number;
-}
-
-interface TokenResponse {
-  access_token?: string;
-  token_type?: string;
-  scope?: string;
-  error?: string;
-  error_description?: string;
-  interval?: number;
-}
-
-async function startDeviceFlow(): Promise<DeviceFlowResponse> {
+async function startDeviceFlow() {
   const response = await fetch(GITHUB_DEVICE_CODE_URL, {
     method: 'POST',
     headers: {
@@ -50,14 +34,14 @@ async function startDeviceFlow(): Promise<DeviceFlowResponse> {
     }),
   });
 
-  const payload = (await response.json()) as DeviceFlowResponse;
+  const payload = await response.json();
   if (!response.ok) {
     throw new Error(`Device flow failed: ${response.status} ${JSON.stringify(payload)}`);
   }
   return payload;
 }
 
-async function pollForToken(deviceCode: string, interval: number, expiresIn: number): Promise<string> {
+async function pollForToken(deviceCode, interval, expiresIn) {
   const deadline = Date.now() + expiresIn * 1000;
   let pollInterval = interval || 5;
 
@@ -77,7 +61,7 @@ async function pollForToken(deviceCode: string, interval: number, expiresIn: num
       }),
     });
 
-    const payload = (await response.json()) as TokenResponse;
+    const payload = await response.json();
 
     if (payload.access_token) {
       return payload.access_token;
@@ -114,7 +98,7 @@ console.log('\nWaiting for authorization...');
 
 const accessToken = await pollForToken(flow.device_code, flow.interval, flow.expires_in);
 
-await Bun.write(TOKEN_FILE, accessToken.trim() + '\n');
+await writeFile(TOKEN_FILE, accessToken.trim() + '\n');
 await chmod(TOKEN_FILE, 0o600);
 
 console.log(`\n✓ Token saved to .token`);
