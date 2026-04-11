@@ -1,12 +1,12 @@
 import { resolve } from 'node:path';
+import { readFile, access } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
 import type { Request, Response } from 'express';
 import { getCopilotToken, getCopilotApiBaseUrl } from './copilot-token';
 import { MODEL_ALIASES } from './constants';
 
-const PROJECT_ROOT = resolve(import.meta.dir, '..');
-const DEVICE_FILE = resolve(PROJECT_ROOT, '.device');
+const DEVICE_FILE = resolve(__dirname ?? import.meta.dir, '..', '.device');
 
 interface DeviceInfo {
   vscodeSessionId: string;
@@ -18,11 +18,13 @@ let deviceInfo: DeviceInfo | null = null;
 
 async function getDeviceInfo(): Promise<DeviceInfo> {
   if (deviceInfo) return deviceInfo;
-  const file = Bun.file(DEVICE_FILE);
-  if (!(await file.exists())) {
+  try {
+    await access(DEVICE_FILE);
+  } catch {
     throw new Error(`.device not found. Run: bun run scripts/setup-device.ts`);
   }
-  deviceInfo = await file.json();
+  const content = await readFile(DEVICE_FILE, 'utf-8');
+  deviceInfo = JSON.parse(content);
   return deviceInfo!;
 }
 

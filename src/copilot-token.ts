@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { chmod } from 'node:fs/promises';
+import { readFile, writeFile, chmod, access } from 'node:fs/promises';
 import {
   GITHUB_API_BASE_URL,
   GITHUB_COPILOT_TOKEN_PATH,
@@ -7,9 +7,8 @@ import {
   DEFAULT_COPILOT_API_BASE_URL,
 } from './constants';
 
-const PROJECT_ROOT = resolve(import.meta.dir, '..');
-const TOKEN_FILE = resolve(PROJECT_ROOT, '.token');
-const COPILOT_FILE = resolve(PROJECT_ROOT, '.copilot');
+const TOKEN_FILE = resolve(__dirname ?? import.meta.dir, '..', '.token');
+const COPILOT_FILE = resolve(__dirname ?? import.meta.dir, '..', '.copilot');
 
 export interface CopilotTokenResponse {
   endpoints: {
@@ -33,27 +32,28 @@ function isTokenValid(token: CopilotTokenResponse | null): boolean {
 }
 
 async function readGitHubToken(): Promise<string> {
-  const file = Bun.file(TOKEN_FILE);
-  if (!(await file.exists())) {
+  try {
+    await access(TOKEN_FILE);
+  } catch {
     throw new Error(`.token not found. Run: bun run scripts/auth.ts`);
   }
-  const token = (await file.text()).trim();
+  const token = (await readFile(TOKEN_FILE, 'utf-8')).trim();
   if (!token) throw new Error('.token file is empty');
   return token;
 }
 
 async function readCachedCopilotToken(): Promise<CopilotTokenResponse | null> {
   try {
-    const file = Bun.file(COPILOT_FILE);
-    if (!(await file.exists())) return null;
-    return await file.json();
+    await access(COPILOT_FILE);
+    const content = await readFile(COPILOT_FILE, 'utf-8');
+    return JSON.parse(content);
   } catch {
     return null;
   }
 }
 
 async function writeCopilotToken(token: CopilotTokenResponse): Promise<void> {
-  await Bun.write(COPILOT_FILE, JSON.stringify(token, null, 2) + '\n');
+  await writeFile(COPILOT_FILE, JSON.stringify(token, null, 2) + '\n');
   await chmod(COPILOT_FILE, 0o600);
 }
 
