@@ -1,9 +1,10 @@
 import express from 'express';
-import { proxyMessages } from './proxy';
+import { proxyEmbeddings } from './embeddings';
+import { proxyMessages } from './messages';
 
 const app = express();
 
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json());
 
 // Validate x-api-key header against API_KEY from .env
 app.use((req, res, next) => {
@@ -16,8 +17,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// POST /v1/messages — proxy to Copilot API
+// POST /v1/messages and /v1/embeddings — proxy to Copilot API
 app.post('/v1/messages', proxyMessages);
+app.post('/v1/embeddings', proxyEmbeddings);
 
 // Everything else — 404 + log
 app.use((req, res) => {

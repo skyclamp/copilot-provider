@@ -1,8 +1,7 @@
 import { resolve } from 'node:path';
 import { readFile, access } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
-import { Readable } from 'node:stream';
-import type { Request, Response } from 'express';
+import type { Response } from 'express';
 import { getCopilotToken, getCopilotApiBaseUrl } from './copilot-token';
 import { MODEL_ALIASES } from './constants';
 
@@ -12,6 +11,11 @@ interface DeviceInfo {
   vscodeSessionId: string;
   vscodeMachineId: string;
   editorDeviceId: string;
+}
+
+export interface ProxyContext {
+  apiBase: string;
+  headers: Record<string, string>;
 }
 
 let deviceInfo: DeviceInfo | null = null;
@@ -50,63 +54,39 @@ function buildHeaders(copilotToken: string, device: DeviceInfo): Record<string, 
   };
 }
 
-function mapModel(model: string): string {
+export function mapModel(model: string): string {
   return MODEL_ALIASES[model] || model;
 }
 
-export async function proxyMessages(req: Request, res: Response): Promise<void> {
-  try {
-    const tokenResponse = await getCopilotToken();
-    const device = await getDeviceInfo();
-    const apiBase = getCopilotApiBaseUrl(tokenResponse);
-    const headers = buildHeaders(tokenResponse.token, device);
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
-    const body = { ...req.body };
-    if (body.model) {
-      body.model = mapModel(body.model);
-    }
+export async function getProxyContext(): Promise<ProxyContext> {
+  const tokenResponse = await getCopilotToken();
+  const device = await getDeviceInfo();
+  return {
+    apiBase: getCopilotApiBaseUrl(tokenResponse),
+    headers: buildHeaders(tokenResponse.token, device),
+  };
+}
 
-    const url = `${apiBase}/v1/messages`;
-    const effort = body.output_config?.effort ?? 'high';
-    const thinkingType = body.thinking?.type ?? 'none';
-    console.log(`[proxy] ${body.model} stream=${body.stream ?? false} effort=${effort} thinking=${thinkingType}`);
+export function forwardUpstreamIds(upstream: globalThis.Response, res: Response): void {
+  const requestId = upstream.headers.get('x-request-id');
+  if (requestId) {
+    res.setHeader('x-request-id', requestId);
+  }
 
-    const upstream = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-    });
+  const githubRequestId = upstream.headers.get('x-github-request-id');
+  if (githubRequestId) {
+    res.setHeader('x-github-request-id', githubRequestId);
+  }
+}
 
-    // Forward status + common headers
-    res.status(upstream.status);
-    const contentType = upstream.headers.get('content-type');
-    if (contentType) res.setHeader('Content-Type', contentType);
-    const requestId = upstream.headers.get('x-request-id');
-    if (requestId) res.setHeader('x-request-id', requestId);
-
-    // Non-200: read body, log, then forward
-    if (!upstream.ok) {
-      const errorBody = await upstream.text();
-      console.error(`[proxy] upstream ${upstream.status}: ${errorBody}`);
-      res.send(errorBody);
-      return;
-    }
-
-    // 200: pipe body (works for both streaming SSE and regular JSON)
-    if (upstream.body) {
-      res.flushHeaders();
-      const readable = Readable.fromWeb(upstream.body as any);
-      readable.pipe(res);
-    } else {
-      res.end();
-    }
-  } catch (error) {
-    console.error('[proxy] Error:', error);
-    if (!res.headersSent) {
-      res.status(502).json({
-        type: 'error',
-        error: { type: 'proxy_error', message: String(error) },
-      });
-    }
+export function forwardUpstreamHeaders(upstream: globalThis.Response, res: Response): void {
+  forwardUpstreamIds(upstream, res);
+  const contentType = upstream.headers.get('content-type');
+  if (contentType) {
+    res.setHeader('Content-Type', contentType);
   }
 }

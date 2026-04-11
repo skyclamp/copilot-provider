@@ -2,12 +2,12 @@
 
 ## 目标
 
-提供一个轻量代理服务，将 Claude Messages API（`/v1/messages`）请求透传到 GitHub Copilot API，封装整个 GitHub OAuth + Copilot Token 的认证流程。客户端只需像调用原生 Claude API 一样发请求即可。
+提供一个轻量代理服务，将 Claude Messages API（`/v1/messages`）和 OpenAI Embeddings API（`/v1/embeddings`）请求转发到 GitHub Copilot API，封装整个 GitHub OAuth + Copilot Token 的认证流程。
 
 ## 架构概览
 
 ```
-客户端 (Claude API 格式)
+客户端 (Claude / OpenAI API 格式)
     │
     ▼
 ┌─────────────────────────────────┐
@@ -17,6 +17,11 @@
 │    2. 获取 Copilot Token        │
 │    3. 透传 request → Copilot    │
 │    4. 透传 response → 客户端    │
+│  POST /v1/embeddings            │
+│    1. 校验固定模型              │
+│    2. 规范化 input 为 string[]  │
+│    3. 转发到 Copilot /embeddings│
+│    4. 补齐 OpenAI 风格响应字段   │
 │  其他路由 → 404 + log           │
 └─────────────────────────────────┘
     │
@@ -48,9 +53,27 @@ GitHub Copilot API (https://api.githubcopilot.com)
 - `claude-haiku-4-5`
 - `claude-haiku-4-5-20251001` → 自动映射为 `claude-haiku-4-5`
 
+### `POST /v1/embeddings`
+
+对外暴露 OpenAI 风格 embeddings 接口，对内转发到 Copilot 上游的 `/embeddings`。
+
+**行为：**
+1. `model` 必须是 `text-embedding-3-small`
+2. `input` 支持单个非空字符串或非空字符串数组
+3. 单字符串会被规范化成 `string[]`
+4. 透传 `dimensions`
+5. 只接受 `encoding_format: "float"`；其他值直接返回 400
+6. 成功响应补齐稳定的 OpenAI 风格顶层字段：`object`、`data`、`model`
+
+**约束：**
+- 仅支持 `text-embedding-3-small`
+- 不支持 token-array 形式的 `input`
+- 不支持 `encoding_format: "base64"`
+- 上游真实路径是 `{endpoints.api}/embeddings`，不是 `{endpoints.api}/v1/embeddings`
+
 ### 其他所有请求 → 404
 
-任何非 `POST /v1/messages` 的请求统一返回 404，同时在服务端打印日志：
+任何非 `POST /v1/messages` / `POST /v1/embeddings` 的请求统一返回 404，同时在服务端打印日志：
 
 ```
 [404] GET /v1/models
@@ -167,7 +190,7 @@ copilot-provider/
 │   └── setup-device.ts         # 生成 .device（设备 ID）
 ├── src/
 │   ├── server.ts               # Express app 定义 + 路由
-│   ├── proxy.ts                # /v1/messages 代理逻辑（含 SSE 转发）
+│   ├── proxy.ts                # /v1/messages 与 /v1/embeddings 代理逻辑
 │   ├── copilot-token.ts        # Copilot Token 获取 + 缓存 + 刷新
 │   └── constants.ts            # URL、默认值等常量
 ├── .token                      # GitHub access_token（git ignored）
@@ -208,12 +231,16 @@ bun run index.ts
 curl -X POST http://localhost:4141/v1/messages \
   -H "Content-Type: application/json" \
   -d '{"model":"claude-sonnet-4-6","max_tokens":1024,"messages":[{"role":"user","content":"hi"}]}'
+
+curl -X POST http://localhost:4141/v1/embeddings \
+  -H "Content-Type: application/json" \
+  -d '{"model":"text-embedding-3-small","input":"The quick brown fox jumped over the lazy dog"}'
 ```
 
 ## 不做的事情
 
 - **不做** 客户端认证/鉴权（这是本地工具，不暴露到公网）
-- **不做** 请求体校验（透传即可，错误由 Copilot API 返回）
-- **不做** response body 的任何修改（原样透传）
+- **不做** `/v1/messages` 的请求体校验（透传即可，错误由 Copilot API 返回）
+- **不做** 除 `/v1/embeddings` 兼容层之外的 response body 修改
 - **不做** 多用户支持（单用户本地使用）
 - **不做** view engine / 静态文件 / cookie 等 web 功能

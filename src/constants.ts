@@ -14,3 +14,5 @@ export const MODEL_ALIASES: Record<string, string> = {
   'sonnet': 'claude-sonnet-4-6',
   'opus': 'claude-opus-4-6',
 };
+
+export const SUPPORTED_EMBEDDING_MODEL = 'text-embedding-3-small';
