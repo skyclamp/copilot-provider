@@ -1,6 +1,7 @@
 import express from 'express';
 import { proxyEmbeddings } from './embeddings.js';
 import { proxyMessages } from './messages.js';
+import { proxyResponses } from './responses.js';
 
 const app = express();
 
@@ -20,7 +21,7 @@ function validateMessagesApiKey(req, res, next) {
   next();
 }
 
-function validateEmbeddingsAuthorization(req, res, next) {
+function validateOpenAIAuthorization(req, res, next) {
   const apiKey = process.env.API_KEY;
   const authorization = req.headers.authorization;
   if (apiKey && authorization !== `Bearer ${apiKey}`) {
@@ -30,9 +31,10 @@ function validateEmbeddingsAuthorization(req, res, next) {
   next();
 }
 
-// POST /v1/messages and /v1/embeddings — proxy to Copilot API
+// POST /v1/messages, /v1/responses, and /v1/embeddings — proxy to Copilot API
 app.post('/v1/messages', validateMessagesApiKey, proxyMessages);
-app.post('/v1/embeddings', validateEmbeddingsAuthorization, proxyEmbeddings);
+app.post('/v1/responses', validateOpenAIAuthorization, proxyResponses);
+app.post('/v1/embeddings', validateOpenAIAuthorization, proxyEmbeddings);
 
 // Everything else — 404 + log
 app.use((req, res) => {

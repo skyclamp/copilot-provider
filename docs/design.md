@@ -2,7 +2,7 @@
 
 ## 目标
 
-提供一个轻量代理服务，将 Claude Messages API（`/v1/messages`）和 OpenAI Embeddings API（`/v1/embeddings`）请求转发到 GitHub Copilot API，封装整个 GitHub OAuth + Copilot Token 的认证流程。
+提供一个轻量代理服务，将 Claude Messages API（`/v1/messages`）以及 OpenAI 风格的 Responses API（`/v1/responses`）和 Embeddings API（`/v1/embeddings`）请求转发到 GitHub Copilot API，封装整个 GitHub OAuth + Copilot Token 的认证流程。
 
 ## 架构概览
 
@@ -17,6 +17,10 @@
 │    2. 获取 Copilot Token        │
 │    3. 透传 request → Copilot    │
 │    4. 透传 response → 客户端    │
+│  POST /v1/responses             │
+│    1. 获取 Copilot Token        │
+│    2. 透传 request → Copilot    │
+│    3. 透传 response → 客户端    │
 │  POST /v1/embeddings            │
 │    1. 校验固定模型              │
 │    2. 规范化 input 为 string[]  │
@@ -49,7 +53,7 @@ GitHub Copilot API (https://api.githubcopilot.com)
 
 **认证：**
 - 如果配置了 `API_KEY`，`/v1/messages` 需要 `x-api-key: <API_KEY>`
-- 如果配置了 `API_KEY`，`/v1/embeddings` 需要 `Authorization: Bearer <API_KEY>`
+- 如果配置了 `API_KEY`，`/v1/responses` 和 `/v1/embeddings` 需要 `Authorization: Bearer <API_KEY>`
 
 **支持的 model 值：**
 - `claude-opus-4-6`
@@ -75,9 +79,25 @@ GitHub Copilot API (https://api.githubcopilot.com)
 - 不支持 `encoding_format: "base64"`
 - 上游真实路径是 `{endpoints.api}/embeddings`，不是 `{endpoints.api}/v1/embeddings`
 
+### `POST /v1/responses`
+
+对外暴露 OpenAI Responses API，对内直接透传到 Copilot 上游的 `/responses`。
+
+**行为：**
+1. 读取客户端请求 body
+2. 组装 Copilot 所需的 headers（Authorization、User-Agent、各种 ID 等）
+3. 如果客户端传了 `Accept`，原样转发给上游
+4. 将请求转发到 `{endpoints.api}/responses`
+5. 将 Copilot 的 response（包括 SSE 流）原样透传回客户端
+
+**约束：**
+- 不对 `model` 做白名单限制
+- 不对 request body 做结构校验
+- 上游真实路径是 `{endpoints.api}/responses`，不是 `{endpoints.api}/v1/responses`
+
 ### 其他所有请求 → 404
 
-任何非 `POST /v1/messages` / `POST /v1/embeddings` 的请求统一返回 404，同时在服务端打印日志：
+任何非 `POST /v1/messages` / `POST /v1/responses` / `POST /v1/embeddings` 的请求统一返回 404，同时在服务端打印日志：
 
 ```
 [404] GET /v1/models
@@ -195,7 +215,10 @@ copilot-provider/
 │   └── setup-device.js         # 生成 .device（设备 ID）
 ├── src/
 │   ├── server.js               # Express app 定义 + 路由
-│   ├── proxy.js                # /v1/messages 与 /v1/embeddings 代理逻辑
+│   ├── proxy.js                # 共享代理辅助逻辑
+│   ├── messages.js             # /v1/messages 代理
+│   ├── responses.js            # /v1/responses 代理
+│   ├── embeddings.js           # /v1/embeddings 代理
 │   ├── copilot-token.js        # Copilot Token 获取 + 缓存 + 刷新
 │   └── constants.js            # URL、默认值等常量
 ├── .token                      # GitHub access_token（git ignored）
@@ -242,12 +265,17 @@ curl -X POST http://localhost:4141/v1/embeddings \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $API_KEY" \
   -d '{"model":"text-embedding-3-small","input":"The quick brown fox jumped over the lazy dog"}'
+
+curl -X POST http://localhost:4141/v1/responses \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $API_KEY" \
+  -d '{"model":"gpt-5.4","input":"hi","stream":false}'
 ```
 
 ## 不做的事情
 
 - **不做** 客户端认证/鉴权（这是本地工具，不暴露到公网）
-- **不做** `/v1/messages` 的请求体校验（透传即可，错误由 Copilot API 返回）
+- **不做** `/v1/messages` 与 `/v1/responses` 的请求体校验（透传即可，错误由 Copilot API 返回）
 - **不做** 除 `/v1/embeddings` 兼容层之外的 response body 修改
 - **不做** 多用户支持（单用户本地使用）
 - **不做** view engine / 静态文件 / cookie 等 web 功能
