@@ -10,7 +10,16 @@ export async function proxyMessages(req, res) {
       body.model = mapModel(body.model);
     }
 
-    headers['anthropic-beta'] = req.headers['anthropic-beta'];
+    if (req.headers['anthropic-beta'].includes('context-1m-2025-08-07') && body.model == 'claude-opus-4-6') {
+      body.model = 'claude-opus-4.6-1m';
+      headers['anthropic-beta'] = req.headers['anthropic-beta']
+        .split(',')
+        .map(h => h.trim())
+        .filter(h => h !== 'context-1m-2025-08-07')
+        .join(',');
+    } else {
+      headers['anthropic-beta'] = req.headers['anthropic-beta'];
+    }
 
     const outputConfig = isRecord(body.output_config) ? body.output_config : null;
     const thinking = isRecord(body.thinking) ? body.thinking : null;
