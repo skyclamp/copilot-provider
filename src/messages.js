@@ -1,5 +1,5 @@
-import { Readable } from 'node:stream';
 import { forwardUpstreamHeaders, getProxyContext, isRecord, mapModel } from './proxy.js';
+import { pipeAndExtractUsage } from './usage.js';
 
 export async function proxyMessages(req, res) {
   try {
@@ -11,6 +11,7 @@ export async function proxyMessages(req, res) {
     }
 
     if (req.headers['anthropic-beta'].includes('context-1m-2025-08-07') && body.model == 'claude-opus-4-6') {
+      // Only `claude-opus-4.6` supports the context-1m-2025-08-07 header.
       body.model = 'claude-opus-4.6-1m';
       headers['anthropic-beta'] = req.headers['anthropic-beta']
         .split(',')
@@ -46,9 +47,12 @@ export async function proxyMessages(req, res) {
     }
 
     if (upstream.body) {
-      res.flushHeaders();
-      const readable = Readable.fromWeb(upstream.body);
-      readable.pipe(res);
+      await pipeAndExtractUsage(upstream, res, {
+        endpoint: 'messages',
+        keyId: req.apiKeyId,
+        stream: Boolean(body.stream),
+        requestModel: typeof body.model === 'string' ? body.model : null,
+      });
       return;
     }
 

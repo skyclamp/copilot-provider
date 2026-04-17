@@ -1,5 +1,5 @@
-import { Readable } from 'node:stream';
 import { forwardUpstreamHeaders, getProxyContext, isRecord } from './proxy.js';
+import { pipeAndExtractUsage } from './usage.js';
 
 export async function proxyResponses(req, res) {
   try {
@@ -10,7 +10,7 @@ export async function proxyResponses(req, res) {
       headers.Accept = req.headers.accept;
     }
 
-    console.log(`[proxy] responses model=${String(body.model)} stream=${Boolean(body.stream)} effort=${req.body.reasoning?.effort ?? 'none'}`);
+    console.log(`[proxy] responses model=${String(body.model)} stream=${Boolean(body.stream)} effort=${req.body.reasoning?.effort ?? 'none'} key=${req.apiKeyId ?? 'anon'}`);
 
     const upstream = await fetch(`${apiBase}/responses`, {
       method: 'POST',
@@ -29,9 +29,12 @@ export async function proxyResponses(req, res) {
     }
 
     if (upstream.body) {
-      res.flushHeaders();
-      const readable = Readable.fromWeb(upstream.body);
-      readable.pipe(res);
+      await pipeAndExtractUsage(upstream, res, {
+        endpoint: 'responses',
+        keyId: req.apiKeyId,
+        stream: Boolean(body.stream),
+        requestModel: typeof body.model === 'string' ? body.model : null,
+      });
       return;
     }
 

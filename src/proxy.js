@@ -1,25 +1,15 @@
-import { dirname, resolve } from 'node:path';
-import { readFile, access } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
-import { fileURLToPath } from 'node:url';
 import { getCopilotToken, getCopilotApiBaseUrl } from './copilot-token.js';
 import { MODEL_ALIASES } from './constants.js';
 
-const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
-const DEVICE_FILE = resolve(MODULE_DIR, '..', '.device');
-
-let deviceInfo = null;
-
-async function getDeviceInfo() {
-  if (deviceInfo) return deviceInfo;
-  try {
-    await access(DEVICE_FILE);
-  } catch {
-    throw new Error('.device not found. Run: bun run scripts/setup-device.js');
+function getDeviceInfo() {
+  const vscodeSessionId = process.env.VSCODE_SESSION_ID;
+  const vscodeMachineId = process.env.VSCODE_MACHINE_ID;
+  const editorDeviceId = process.env.EDITOR_DEVICE_ID;
+  if (!vscodeSessionId || !vscodeMachineId || !editorDeviceId) {
+    throw new Error('Device env vars not set. Run: bun run scripts/setup-device.js');
   }
-  const content = await readFile(DEVICE_FILE, 'utf-8');
-  deviceInfo = JSON.parse(content);
-  return deviceInfo;
+  return { vscodeSessionId, vscodeMachineId, editorDeviceId };
 }
 
 function buildHeaders(copilotToken, device) {
@@ -54,7 +44,7 @@ export function isRecord(value) {
 
 export async function getProxyContext() {
   const tokenResponse = await getCopilotToken();
-  const device = await getDeviceInfo();
+  const device = getDeviceInfo();
   return {
     apiBase: getCopilotApiBaseUrl(tokenResponse),
     headers: buildHeaders(tokenResponse.token, device),

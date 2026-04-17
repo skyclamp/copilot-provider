@@ -1,21 +1,15 @@
 /**
- * GitHub Device Flow OAuth — run once to generate .token
+ * GitHub Device Flow OAuth — prints GITHUB_TOKEN for .env
  *
  * Usage: bun run scripts/auth.js
  */
 
-import { dirname, resolve } from 'node:path';
-import { chmod, writeFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
 import {
   GITHUB_DEVICE_CODE_URL,
   GITHUB_ACCESS_TOKEN_URL,
   GITHUB_CLIENT_ID,
   GITHUB_SCOPE,
 } from '../src/constants.js';
-
-const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const TOKEN_FILE = resolve(SCRIPT_DIR, '../.token');
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -98,7 +92,5 @@ console.log('\nWaiting for authorization...');
 
 const accessToken = await pollForToken(flow.device_code, flow.interval, flow.expires_in);
 
-await writeFile(TOKEN_FILE, accessToken.trim() + '\n');
-await chmod(TOKEN_FILE, 0o600);
-
-console.log(`\n✓ Token saved to .token`);
+console.log('\n# GitHub token (paste into .env)');
+console.log(`GITHUB_TOKEN=${accessToken.trim()}`);

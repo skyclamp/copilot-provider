@@ -1,24 +1,13 @@
 /**
- * Generate .device file with random device IDs for Copilot API headers.
+ * Generate random device IDs for Copilot API headers.
+ * Prints env vars to stdout — paste them into your .env file.
  *
  * Usage: bun run scripts/setup-device.js
  */
 
-import { dirname, resolve } from 'node:path';
-import { writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
-import { fileURLToPath } from 'node:url';
 
-const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const DEVICE_FILE = resolve(SCRIPT_DIR, '../.device');
-
-const device = {
-  vscodeSessionId: randomUUID(),
-  vscodeMachineId: randomUUID(),
-  editorDeviceId: randomUUID(),
-};
-
-await writeFile(DEVICE_FILE, JSON.stringify(device, null, 2) + '\n');
-
-console.log('✓ Device info saved to .device');
-console.log(JSON.stringify(device, null, 2));
+console.log('# Copilot device IDs (paste into .env)');
+console.log(`VSCODE_SESSION_ID=${randomUUID()}`);
+console.log(`VSCODE_MACHINE_ID=${randomUUID()}`);
+console.log(`EDITOR_DEVICE_ID=${randomUUID()}`);

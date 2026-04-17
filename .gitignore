@@ -1,6 +1,6 @@
-.token
-.device
-.copilot
+usage/
+keys.json
+models.json
 
 # Logs
 logs
