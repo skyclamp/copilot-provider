@@ -25,6 +25,10 @@ function resolveProvidedKey(rawKey) {
 }
 
 function validateMessagesApiKey(req, res, next) {
+  if (process.env.DISABLE_INPUT_AUTH === 'true') {
+    req.apiKeyId = 'noauth';
+    return next();
+  }
   const envKey = process.env.API_KEY;
   const header = req.headers['x-api-key'];
   // If neither env key nor any keys.json is required, allow through (back-compat).
@@ -42,6 +46,10 @@ function validateMessagesApiKey(req, res, next) {
 }
 
 function validateOpenAIAuthorization(req, res, next) {
+  if (process.env.DISABLE_INPUT_AUTH === 'true') {
+    req.apiKeyId = 'noauth';
+    return next();
+  }
   const envKey = process.env.API_KEY;
   const authorization = req.headers.authorization || '';
   const bearer = authorization.startsWith('Bearer ') ? authorization.slice(7) : null;
