@@ -1,6 +1,8 @@
 import { forwardUpstreamHeaders, getProxyContext, isRecord, mapModel } from './proxy.js';
 import { pipeAndExtractUsage } from './usage.js';
 
+const EFFORT_RANK = { low: 0, medium: 1, high: 2, xhigh: 3, max: 4 };
+
 export async function proxyMessages(req, res) {
   try {
     const { apiBase, headers } = await getProxyContext();
@@ -10,24 +12,38 @@ export async function proxyMessages(req, res) {
       body.model = mapModel(body.model);
     }
 
-    if (req.headers['anthropic-beta'].includes('context-1m-2025-08-07') && body.model == 'claude-opus-4-6') {
-      // Only `claude-opus-4.6` supports the context-1m-2025-08-07 header.
-      body.model = 'claude-opus-4.6-1m';
-      headers['anthropic-beta'] = req.headers['anthropic-beta']
-        .split(',')
-        .map(h => h.trim())
-        .filter(h => h !== 'context-1m-2025-08-07')
-        .join(',');
+    // All models now support 1M context implicitly; the upstream does not
+    // accept the `context-1m-2025-08-07` beta header, so strip it but
+    // otherwise forward the rest of `anthropic-beta` unchanged.
+    const upstreamBeta = (req.headers['anthropic-beta'] || '')
+      .split(',')
+      .map(h => h.trim())
+      .filter(h => h && h !== 'context-1m-2025-08-07')
+      .join(',');
+    if (upstreamBeta) {
+      headers['anthropic-beta'] = upstreamBeta;
     } else {
-      headers['anthropic-beta'] = req.headers['anthropic-beta'];
+      delete headers['anthropic-beta'];
     }
 
     const outputConfig = isRecord(body.output_config) ? body.output_config : null;
     const thinking = isRecord(body.thinking) ? body.thinking : null;
-    const effort = typeof outputConfig?.effort === 'string' ? outputConfig.effort : 'high';
+    const originalEffort = typeof outputConfig?.effort === 'string' ? outputConfig.effort : null;
+    let effort = originalEffort;
+    // `claude-opus-4-7` only supports up to `medium` effort; silently cap when an
+    // explicit effort above `medium` was provided. Do not introduce an effort field
+    // if the caller did not set one.
+    if (
+      body.model === 'claude-opus-4-7' &&
+      originalEffort !== null &&
+      EFFORT_RANK[originalEffort] > EFFORT_RANK.medium
+    ) {
+      effort = 'medium';
+      outputConfig.effort = 'medium';
+    }
     const thinkingType = typeof thinking?.type === 'string' ? thinking.type : 'none';
     console.log(
-      `[proxy] ${String(body.model)} stream=${Boolean(body.stream)} effort=${effort} thinking=${thinkingType}`,
+      `[proxy] ${String(body.model)} stream=${Boolean(body.stream)} effort=${originalEffort} thinking=${thinkingType}`,
     );
 
     const upstream = await fetch(`${apiBase}/v1/messages`, {
