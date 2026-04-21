@@ -1,5 +1,5 @@
 import { forwardUpstreamHeaders, getProxyContext, isRecord } from './proxy.js';
-import { pipeAndExtractUsage } from './usage.js';
+import { pickHeaderExtras, pipeAndExtractUsage } from './usage.js';
 
 export async function proxyResponses(req, res) {
   try {
@@ -29,11 +29,20 @@ export async function proxyResponses(req, res) {
     }
 
     if (upstream.body) {
+      const extras = pickHeaderExtras(req.headers, [
+        'x-session-id',
+        'x-session-affinity',
+        'x-opencode-session',
+      ]);
+      if (typeof req.headers['user-agent'] === 'string') {
+        extras['user-agent'] = req.headers['user-agent'];
+      }
       await pipeAndExtractUsage(upstream, res, {
         endpoint: 'responses',
         keyId: req.apiKeyId,
         stream: Boolean(body.stream),
         requestModel: typeof body.model === 'string' ? body.model : null,
+        extras,
       });
       return;
     }

@@ -26,6 +26,22 @@ export function listKeyIds() {
   return Array.from(KEY_TO_ID.values());
 }
 
+// Picks the first present header value from the given list and returns
+// an object like { [headerName]: value }. Useful for preserving the
+// provenance of session identifiers in usage logs.
+export function pickHeaderExtras(headers, names) {
+  const out = {};
+  if (!headers) return out;
+  for (const name of names) {
+    const v = headers[name];
+    if (typeof v === 'string' && v.length > 0) {
+      out[name] = v;
+      break;
+    }
+  }
+  return out;
+}
+
 function currentMonth(date = new Date()) {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
@@ -36,7 +52,7 @@ export function usageLogPath(keyId, month = currentMonth()) {
 
 // Appends one JSON object per line. A single fs.appendFile call issues a POSIX
 // append, which is atomic for small writes, so no explicit lock is needed.
-export async function recordUsage(keyId, { model, usage }) {
+export async function recordUsage(keyId, { model, usage, extras }) {
   if (!keyId) return;
   const now = new Date();
   const path = usageLogPath(keyId, currentMonth(now));
@@ -44,6 +60,7 @@ export async function recordUsage(keyId, { model, usage }) {
     ts: now.getTime(),
     model: model || null,
     usage: usage || {},
+    ...(extras && typeof extras === 'object' ? extras : {}),
   };
   await mkdir(dirname(path), { recursive: true });
   await appendFile(path, JSON.stringify(entry) + '\n');
@@ -141,7 +158,7 @@ function extractFromJsonBody(jsonText) {
 
 // -------------------- Tee + track --------------------
 
-export async function pipeAndExtractUsage(upstream, res, { endpoint, keyId, stream, requestModel }) {
+export async function pipeAndExtractUsage(upstream, res, { endpoint, keyId, stream, requestModel, extras }) {
   res.flushHeaders();
   const contentType = upstream.headers.get('content-type') || '';
   const isSSE = contentType.includes('text/event-stream') || stream;
@@ -181,7 +198,7 @@ export async function pipeAndExtractUsage(upstream, res, { endpoint, keyId, stre
   const usage = extracted.usage || {};
 
   try {
-    await recordUsage(keyId, { model, usage });
+    await recordUsage(keyId, { model, usage, extras });
   } catch (err) {
     console.error('[usage] failed to record:', err);
   }

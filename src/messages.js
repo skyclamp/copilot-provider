@@ -1,5 +1,5 @@
 import { forwardUpstreamHeaders, getProxyContext, isRecord, mapModel } from './proxy.js';
-import { pipeAndExtractUsage } from './usage.js';
+import { pickHeaderExtras, pipeAndExtractUsage } from './usage.js';
 
 const EFFORT_RANK = { low: 0, medium: 1, high: 2, xhigh: 3, max: 4 };
 
@@ -43,7 +43,7 @@ export async function proxyMessages(req, res) {
     }
     const thinkingType = typeof thinking?.type === 'string' ? thinking.type : 'none';
     console.log(
-      `[proxy] ${String(body.model)} stream=${Boolean(body.stream)} effort=${originalEffort} thinking=${thinkingType}`,
+      `[proxy] ${String(body.model)} stream=${Boolean(body.stream)} effort=${originalEffort} thinking=${thinkingType} key=${req.apiKeyId ?? 'anon'}`,
     );
 
     const upstream = await fetch(`${apiBase}/v1/messages`, {
@@ -63,11 +63,20 @@ export async function proxyMessages(req, res) {
     }
 
     if (upstream.body) {
+      const extras = pickHeaderExtras(req.headers, [
+        'x-claude-code-session-id',
+        'x-session-affinity',
+        'x-opencode-session',
+      ]);
+      if (typeof req.headers['user-agent'] === 'string') {
+        extras['user-agent'] = req.headers['user-agent'];
+      }
       await pipeAndExtractUsage(upstream, res, {
         endpoint: 'messages',
         keyId: req.apiKeyId,
         stream: Boolean(body.stream),
         requestModel: typeof body.model === 'string' ? body.model : null,
+        extras,
       });
       return;
     }
