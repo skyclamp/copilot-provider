@@ -114,12 +114,26 @@ const OPENAI_BILLING_USAGE_FIELDS = new Set([
   'output_tokens',
 ]);
 
-function formatBucket(bucket, usageFields = null) {
+function formatNumber(n) {
+  if (typeof n !== 'number' || !Number.isFinite(n)) return String(n);
+  return n.toLocaleString('en-US');
+}
+
+function formatBucket(bucket, { usageFields = null, withCommas = false } = {}) {
+  const fmt = withCommas ? formatNumber : (v) => v;
   const pairs = Object.entries(bucket.usage)
     .filter(([k]) => !usageFields || usageFields.has(k))
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([k, v]) => `${k}=${v}`);
-  return `requests=${bucket.requests} ${pairs.join(' ')}`.trimEnd();
+    .map(([k, v]) => `${k}=${fmt(v)}`);
+  return `requests=${fmt(bucket.requests)} ${pairs.join(' ')}`.trimEnd();
+}
+
+function claudeFamily(model) {
+  if (!model || typeof model !== 'string') return null;
+  if (model.includes('opus')) return 'opus';
+  if (model.includes('sonnet')) return 'sonnet';
+  if (model.includes('haiku')) return 'haiku';
+  return null;
 }
 
 // Pricing per million tokens (USD) for supported Claude models.
@@ -186,8 +200,8 @@ async function main() {
 
   // byKey: Map<keyId, Map<month, Map<bucketKey, bucket>>>
   const byKey = new Map();
-  // costByKeyMonth: Map<keyId, Map<month, number>>
-  const costByKeyMonth = new Map();
+  // claudeCostByKeyMonthBucket: Map<keyId, Map<month, Map<bucketKey, number>>>
+  const claudeCostByKeyMonthBucket = new Map();
   // openaiCostByKeyMonth: Map<keyId, Map<month, number>>
   const openaiCostByKeyMonth = new Map();
   for (const log of logs) {
@@ -195,13 +209,19 @@ async function main() {
     const keyMap = byKey.get(log.keyId) || byKey.set(log.keyId, new Map()).get(log.keyId);
     const monthMap = keyMap.get(log.month) || keyMap.set(log.month, new Map()).get(log.month);
     for (const entry of entries) {
-      const bk = args.byModel ? (entry.model || 'unknown') : '(total)';
+      const family = claudeFamily(entry.model);
+      let bk;
+      if (args.byModel) bk = entry.model || 'unknown';
+      else if (family) bk = `(claude-${family})`;
+      else bk = '(total)';
       const bucket = monthMap.get(bk) || monthMap.set(bk, emptyBucket()).get(bk);
       applyEntry(bucket, entry);
       const cost = computeEntryCost(entry);
       if (cost > 0) {
-        const ck = costByKeyMonth.get(log.keyId) || costByKeyMonth.set(log.keyId, new Map()).get(log.keyId);
-        ck.set(log.month, (ck.get(log.month) || 0) + cost);
+        const ck = claudeCostByKeyMonthBucket.get(log.keyId)
+          || claudeCostByKeyMonthBucket.set(log.keyId, new Map()).get(log.keyId);
+        const cm = ck.get(log.month) || ck.set(log.month, new Map()).get(log.month);
+        cm.set(bk, (cm.get(bk) || 0) + cost);
       }
       const openaiCost = computeOpenAIEntryCost(entry);
       if (openaiCost > 0) {
@@ -216,11 +236,14 @@ async function main() {
     for (const [keyId, keyMap] of byKey) {
       out[keyId] = {};
       for (const [month, monthMap] of keyMap) {
-        const cost = costByKeyMonth.get(keyId)?.get(month) || 0;
+        const costMap = claudeCostByKeyMonthBucket.get(keyId)?.get(month);
         const openaiCost = openaiCostByKeyMonth.get(keyId)?.get(month) || 0;
+        const claudeCosts = costMap ? Object.fromEntries(costMap) : {};
+        const totalClaudeCost = Object.values(claudeCosts).reduce((a, b) => a + b, 0);
         out[keyId][month] = {
           ...Object.fromEntries(monthMap),
-          _cost_estimate_usd: cost,
+          _cost_estimate_usd: totalClaudeCost,
+          _claude_cost_by_bucket_usd: claudeCosts,
           _openai_cost_estimate_usd: openaiCost,
         };
       }
@@ -236,18 +259,26 @@ async function main() {
       console.log(`  ${month}`);
       const monthMap = keyMap.get(month);
       const openaiCost = openaiCostByKeyMonth.get(keyId)?.get(month) || 0;
+      const claudeCostMap = claudeCostByKeyMonthBucket.get(keyId)?.get(month);
       for (const bk of Array.from(monthMap.keys()).sort()) {
+        const isClaudeBucket = bk.startsWith('(claude-')
+          || (args.byModel && claudeFamily(bk) != null);
         const usageFields = keyId.startsWith('openai-') && bk === '(total)'
           ? OPENAI_BILLING_USAGE_FIELDS
           : null;
-        console.log(`    ${bk}: ${formatBucket(monthMap.get(bk), usageFields)}`);
+        console.log(`    ${bk}: ${formatBucket(monthMap.get(bk), { usageFields, withCommas: isClaudeBucket })}`);
+        const bucketCost = claudeCostMap?.get(bk) || 0;
+        if (bucketCost > 0) {
+          const label = bk.startsWith('(') && bk.endsWith(')') ? bk.slice(1, -1) : bk;
+          console.log(`    estimated cost (${label}): ${formatCost(bucketCost)}`);
+        }
         if (bk === '(total)' && openaiCost > 0) {
           console.log(`    estimated cost (openai): ${formatCost(openaiCost)}`);
         }
       }
-      const cost = costByKeyMonth.get(keyId)?.get(month) || 0;
-      if (cost > 0) {
-        console.log(`    estimated cost (claude): ${formatCost(cost)}`);
+      if (claudeCostMap && claudeCostMap.size > 1) {
+        const total = Array.from(claudeCostMap.values()).reduce((a, b) => a + b, 0);
+        console.log(`    estimated cost (claude total): ${formatCost(total)}`);
       }
     }
   }
