@@ -262,12 +262,10 @@ async function main() {
       const openaiCost = openaiCostByKeyMonth.get(keyId)?.get(month) || 0;
       const claudeCostMap = claudeCostByKeyMonthBucket.get(keyId)?.get(month);
       for (const bk of Array.from(monthMap.keys()).sort()) {
-        const isClaudeBucket = bk.startsWith('(claude-')
-          || (args.byModel && claudeFamily(bk) != null);
         const usageFields = keyId.startsWith('openai-') && bk === '(total)'
           ? OPENAI_BILLING_USAGE_FIELDS
           : null;
-        console.log(`    ${bk}: ${formatBucket(monthMap.get(bk), { usageFields, withCommas: isClaudeBucket })}`);
+        console.log(`    ${bk}: ${formatBucket(monthMap.get(bk), { usageFields, withCommas: true })}`);
         const bucketCost = claudeCostMap?.get(bk) || 0;
         if (bucketCost > 0) {
           const label = bk.startsWith('(') && bk.endsWith(')') ? bk.slice(1, -1) : bk;
