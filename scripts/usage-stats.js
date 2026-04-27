@@ -138,10 +138,10 @@ function claudeFamily(model) {
 
 // Pricing per million tokens (USD) for supported Claude models.
 const CLAUDE_PRICING = {
-  'claude-haiku-4-5':  { input: 1,   output: 5,   cache5m: 1.25, cache1h: 2,   cacheRead: 0.10 },
-  'claude-sonnet-4-6': { input: 3,   output: 15,  cache5m: 3.75, cache1h: 6,   cacheRead: 0.30 },
-  'claude-opus-4-6':   { input: 5,   output: 25,  cache5m: 6.25, cache1h: 10,  cacheRead: 0.50 },
-  'claude-opus-4-7':   { input: 5,   output: 25,  cache5m: 6.25, cache1h: 10,  cacheRead: 0.50 },
+  'claude-haiku-4.5':  { input: 1.0,   output: 5.0,   cache5m: 1.25, cache1h: 2.0,   cacheRead: 0.10 },
+  'claude-sonnet-4.6': { input: 3.0,   output: 15.0,  cache5m: 3.75, cache1h: 6.0,   cacheRead: 0.30 },
+  'claude-opus-4.6-1m':   { input: 5.0,   output: 25.0,  cache5m: 6.25, cache1h: 10.0,  cacheRead: 0.50 },
+  'claude-opus-4.7-1m-internal':   { input: 5.0,   output: 25.0,  cache5m: 6.25, cache1h: 10.0,  cacheRead: 0.50 },
 };
 
 function computeEntryCost(entry) {
@@ -164,6 +164,7 @@ function computeEntryCost(entry) {
 
 // Pricing per million tokens (USD) for supported OpenAI models.
 const OPENAI_PRICING = {
+  'gpt-5.5': { input: 5.00, cachedInput: 0.50, output: 30.00 },
   'gpt-5.4': { input: 2.50, cachedInput: 0.25, output: 15.00 },
   'gpt-5.3-codex': { input: 1.75, cachedInput: 0.175, output: 14.00 },
   'gpt-5.4-mini': { input: 0.75, cachedInput: 0.075, output: 4.50 },

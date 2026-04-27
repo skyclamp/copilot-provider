@@ -9,8 +9,12 @@ export const DEFAULT_COPILOT_API_BASE_URL = 'https://api.githubcopilot.com';
 export const TOKEN_API_VERSION = '2025-04-01';
 
 export const MODEL_ALIASES = {
-  'claude-haiku-4-5-20251001': 'claude-haiku-4-5',
-  'haiku': 'claude-haiku-4-5',
-  'sonnet': 'claude-sonnet-4-6',
-  'opus': 'claude-opus-4-7',
+  'claude-haiku-4-5': 'claude-haiku-4.5',
+  'claude-haiku-4-5-20251001': 'claude-haiku-4.5',
+  'claude-sonnet-4-6': 'claude-sonnet-4.6',
+  'claude-opus-4-6': 'claude-opus-4.6-1m',
+  'claude-opus-4-7': 'claude-opus-4.7-1m-internal',
+  'haiku': 'claude-haiku-4.5',
+  'sonnet': 'claude-sonnet-4.6',
+  'opus': (process.env.ENABLE_OPUS_4_7_1M === 'true') ? 'claude-opus-4.7-1m-internal' : 'claude-opus-4.7',
 };
