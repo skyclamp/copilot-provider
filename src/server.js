@@ -49,6 +49,11 @@ function validateOpenAIAuthorization(req, res, next) {
   rejectUnauthorized(req, res, 'authorization');
 }
 
+// HEAD / — health check
+app.head('/', (req, res) => {
+  res.status(200).end();
+});
+
 // POST /v1/messages, /v1/responses, and /v1/embeddings — proxy to Copilot API
 app.post('/v1/messages', validateMessagesApiKey, proxyMessages);
 app.post('/v1/responses', validateOpenAIAuthorization, proxyResponses);
