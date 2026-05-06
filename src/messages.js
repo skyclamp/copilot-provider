@@ -47,14 +47,12 @@ export async function proxyMessages(req, res) {
     //   - claude-opus-4.7        -> medium
     //   - claude-opus-4.7-high   -> high
     //   - claude-opus-4.7-xhigh  -> xhigh
-    // Pick the sub-model from the requested effort (or adaptive thinking)
-    // and coerce the effort to a supported value.
+    // Pick the sub-model from the requested effort and coerce the effort
+    // to a supported value.
     if (model === 'claude-opus-4.7') {
       if (effort === null) {
-        // Adaptive thinking without an explicit effort defaults to `high`.
-        if (thinking?.type === 'adaptive') {
-          model = 'claude-opus-4.7-high';
-        }
+        // The Claude API treats a missing effort as `high`.
+        model = 'claude-opus-4.7-high';
       } else {
         // Coerce to one of: medium / high / xhigh.
         if (EFFORT_RANK[effort] <= EFFORT_RANK.medium) {
