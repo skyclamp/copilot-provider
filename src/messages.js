@@ -3,6 +3,14 @@ import { pickHeaderExtras, pipeAndExtractUsage } from './usage.js';
 
 const EFFORT_RANK = { low: 0, medium: 1, high: 2, xhigh: 3, max: 4 };
 
+// Beta flags the upstream Copilot endpoint does not accept. Filtered out
+// of the `anthropic-beta` request header before forwarding. Add new
+// entries here as they are discovered.
+const ANTHROPIC_BETA_BLACKLIST = new Set([
+  'context-1m-2025-08-07',
+  'advisor-tool-2026-03-01',
+]);
+
 export async function proxyMessages(req, res) {
   try {
     const { apiBase, headers } = await getProxyContext();
@@ -12,13 +20,11 @@ export async function proxyMessages(req, res) {
       body.model = mapModel(body.model);
     }
 
-    // All models now support 1M context implicitly; the upstream does not
-    // accept the `context-1m-2025-08-07` beta header, so strip it but
-    // otherwise forward the rest of `anthropic-beta` unchanged.
+    // Drop blacklisted beta flags; forward the rest unchanged.
     const upstreamBeta = req.headers['anthropic-beta']
       ?.split(',')
       .map(h => h.trim())
-      .filter(h => h && h !== 'context-1m-2025-08-07')
+      .filter(h => h && !ANTHROPIC_BETA_BLACKLIST.has(h))
       .join(',');
     if (upstreamBeta) {
       headers['anthropic-beta'] = upstreamBeta;

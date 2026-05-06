@@ -138,10 +138,14 @@ function claudeFamily(model) {
 
 // Pricing per million tokens (USD) for supported Claude models.
 const CLAUDE_PRICING = {
-  'claude-haiku-4.5':  { input: 1.0,   output: 5.0,   cache5m: 1.25, cache1h: 2.0,   cacheRead: 0.10 },
-  'claude-sonnet-4.6': { input: 3.0,   output: 15.0,  cache5m: 3.75, cache1h: 6.0,   cacheRead: 0.30 },
-  'claude-opus-4.6-1m':   { input: 5.0,   output: 25.0,  cache5m: 6.25, cache1h: 10.0,  cacheRead: 0.50 },
-  'claude-opus-4.7-1m-internal':   { input: 5.0,   output: 25.0,  cache5m: 6.25, cache1h: 10.0,  cacheRead: 0.50 },
+  'claude-haiku-4.5': { input: 1.0, output: 5.0, cache5m: 1.25, cache1h: 2.0, cacheRead: 0.10 },
+  'claude-sonnet-4.6': { input: 3.0, output: 15.0, cache5m: 3.75, cache1h: 6.0, cacheRead: 0.30 },
+  'claude-opus-4.6': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
+  'claude-opus-4.6-1m': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
+  'claude-opus-4.7': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
+  'claude-opus-4.7-high': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
+  'claude-opus-4.7-xhigh': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
+  'claude-opus-4.7-1m-internal': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
 };
 
 function computeEntryCost(entry) {
