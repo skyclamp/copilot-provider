@@ -1,106 +1,132 @@
+# copilot-provider — agent guide
 
-Default to using Bun instead of Node.js.
+A thin proxy that exposes GitHub Copilot's chat backend behind Anthropic /
+OpenAI compatible endpoints. Pure Node.js, no transpilation.
 
-- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
-- Use `bun test` instead of `jest` or `vitest`
-- Use `bun build <file.html|file.ts|file.css>` instead of `webpack` or `esbuild`
-- Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
-- Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `pnpm run <script>`
-- Use `bunx <package> <command>` instead of `npx <package> <command>`
-- Bun automatically loads .env, so don't use dotenv.
+## Runtime
 
-## APIs
+- **Node.js >= 20** (see `engines` in [package.json](package.json)). Do NOT
+  introduce Bun-specific APIs (`Bun.serve`, `bun:sqlite`, `Bun.file`, …) —
+  this project runs under plain `node`.
+- ES modules (`"type": "module"`); use `import` / `export`, not `require`.
+- Dependencies are intentionally minimal: `express` and `dotenv` only.
+  Prefer `node:` built-ins (`node:fs/promises`, `node:crypto`, `node:stream`,
+  `node:path`) over adding new packages.
+- `dotenv/config` is loaded at startup from [index.js](index.js); do not
+  re-load it elsewhere.
 
-- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
-- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
-- `Bun.redis` for Redis. Don't use `ioredis`.
-- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
-- `WebSocket` is built-in. Don't use `ws`.
-- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
-- Bun.$`ls` instead of execa.
-
-## Testing
-
-Use `bun test` to run tests.
-
-```ts#index.test.ts
-import { test, expect } from "bun:test";
-
-test("hello world", () => {
-  expect(1).toBe(1);
-});
-```
-
-## Frontend
-
-Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
-
-Server:
-
-```ts#index.ts
-import index from "./index.html"
-
-Bun.serve({
-  routes: {
-    "/": index,
-    "/api/users/:id": {
-      GET: (req) => {
-        return new Response(JSON.stringify({ id: req.params.id }));
-      },
-    },
-  },
-  // optional websocket support
-  websocket: {
-    open: (ws) => {
-      ws.send("Hello, world!");
-    },
-    message: (ws, message) => {
-      ws.send(message);
-    },
-    close: (ws) => {
-      // handle close
-    }
-  },
-  development: {
-    hmr: true,
-    console: true,
-  }
-})
-```
-
-HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
-
-```html#index.html
-<html>
-  <body>
-    <h1>Hello, world!</h1>
-    <script type="module" src="./frontend.tsx"></script>
-  </body>
-</html>
-```
-
-With the following `frontend.tsx`:
-
-```tsx#frontend.tsx
-import React from "react";
-import { createRoot } from "react-dom/client";
-
-// import .css files directly and it works
-import './index.css';
-
-const root = createRoot(document.body);
-
-export default function Frontend() {
-  return <h1>Hello, world!</h1>;
-}
-
-root.render(<Frontend />);
-```
-
-Then, run index.ts
+## Common commands
 
 ```sh
-bun --hot ./index.ts
+node index.js                  # or: npm start — start the proxy on $PORT (default 4141)
+node scripts/auth.js           # GitHub device-flow login → writes GITHUB_TOKEN to .env
+node scripts/setup-device.js   # generates VSCODE_*/EDITOR_DEVICE_ID into .env
+node scripts/gen-keys.js       # mints input API keys into src/keys.json
+node scripts/fetch-models.js --token <gh-token>   # dumps Copilot /models
+node scripts/usage-stats.js    # summarises usage/*.jsonl
+node scripts/build.js          # bundles into a single file
 ```
 
-For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+There is no test suite and no linter configured. If you add tests, use
+`node --test` (built-in test runner).
+
+## Architecture
+
+Entry point [index.js](index.js) loads dotenv and starts the Express app
+defined in [src/server.js](src/server.js). The server only exposes:
+
+- `HEAD /` — health check
+- `POST /v1/messages` → upstream `{api}/v1/messages` ([src/messages.js](src/messages.js))
+- `POST /v1/responses` → upstream `{api}/responses` ([src/responses.js](src/responses.js))
+- `POST /v1/embeddings` → upstream `{api}/embeddings` ([src/embeddings.js](src/embeddings.js))
+
+Anything else returns `404 null`. See [docs/design.md](docs/design.md) for
+the upstream-path contract — note that `/v1/responses` and `/v1/embeddings`
+strip the `/v1` prefix when forwarding.
+
+### Module layout (`src/`)
+
+| File | Role |
+|------|------|
+| `server.js` | Express app, auth middleware, route table |
+| `proxy.js` | `getProxyContext()`, `mapModel()`, `forwardUpstreamHeaders()`, header builder |
+| `copilot-token.js` | GitHub token → Copilot token exchange + caching |
+| `constants.js` | URLs, API versions, **static** `MODEL_ALIASES` map |
+| `messages.js` | `/v1/messages` proxy: model + effort routing |
+| `responses.js` | `/v1/responses` proxy |
+| `embeddings.js` | `/v1/embeddings` proxy |
+| `usage.js` | API-key resolution, SSE usage parser, `pipeAndExtractUsage()` |
+| `keys.json` | Local input API keys (gitignored; generated by `gen-keys.js`) |
+
+### Proxy contract (do not break)
+
+- **Pass-through by default.** Don't validate or rewrite the request body
+  beyond what's already done (model alias mapping, effort coercion,
+  `anthropic-beta` cleanup).
+- **Errors are pass-through too.** Forward upstream status + body verbatim;
+  only synthesise a `502` when the proxy itself fails.
+- **Streaming uses `pipeAndExtractUsage()`** — it tees the SSE / JSON
+  response through to the client while extracting usage into
+  `usage/<key-id>-YYYY-MM.jsonl`. Don't buffer entire upstream responses.
+- **Only mutate request fields the caller provided.** Specifically: never
+  synthesise `output_config` if absent — only adjust `output_config.effort`
+  when the caller already supplied one. See the write-back block in
+  [src/messages.js](src/messages.js).
+
+### Model + effort routing (`src/messages.js`)
+
+Pattern: snapshot `originalModel` / `originalEffort`, decide the resolved
+`model` / `effort` purely on locals, then write back in one place.
+
+- `MODEL_ALIASES` in [src/constants.js](src/constants.js) is a **plain static
+  map** — no env-reading getters. Sub-model logic does not belong there.
+- Env-driven 1M routing lives in `messages.js`:
+  - `ENABLE_OPUS_4_6_1M=true` → routes `claude-opus-4.6` to `claude-opus-4.6-1m`
+  - `ENABLE_OPUS_4_7_1M=true` → routes `claude-opus-4.7` to `claude-opus-4.7-1m-internal`
+- `claude-opus-4.7` fans out into three sub-models keyed by effort
+  (`medium` → base, `high` → `-high`, `xhigh` → `-xhigh`); `low`/`medium`
+  collapse to `medium`, `max` becomes `xhigh`.
+- `claude-opus-4.7-1m-internal` caps effort at `xhigh`.
+- `claude-opus-4.6{,-1m}` and `claude-sonnet-4.6` cap effort at `high`
+  (i.e. `max` → `high`).
+
+When adding new model rules, follow the same structure: snapshot → mutate
+locals → single write-back guarded by `xxx !== originalXxx`.
+
+### Auth
+
+Two-sided:
+
+1. **Outgoing** — `getCopilotToken()` exchanges `GITHUB_TOKEN` for a
+   short-lived Copilot token via the device endpoint; cached in memory.
+2. **Incoming** — clients must present an input key from `src/keys.json`:
+   - `/v1/messages`: `x-api-key` header
+   - `/v1/responses`, `/v1/embeddings`: `Authorization: Bearer <key>`
+   - Set `DISABLE_INPUT_AUTH=true` to bypass (`req.apiKeyId` becomes
+     `'noauth'`).
+   Invalid keys get `404 null` (intentional — same shape as unknown route).
+
+## Environment variables
+
+See [.env.example](.env.example). Required for normal operation:
+
+- `GITHUB_TOKEN`, `VSCODE_SESSION_ID`, `VSCODE_MACHINE_ID`,
+  `EDITOR_DEVICE_ID` — populated by `scripts/auth.js` + `scripts/setup-device.js`.
+- `COPILOT_CHAT_VERSION`, `VSCODE_VERSION`, `GITHUB_API_VERSION` — sent in
+  upstream headers; bump these to track real Copilot Chat releases.
+- `PORT` (default `4141`).
+
+Optional toggles: `DISABLE_INPUT_AUTH`, `ENABLE_OPUS_4_6_1M`,
+`ENABLE_OPUS_4_7_1M`.
+
+## Conventions
+
+- Keep modules small and direction-of-flow obvious: server → proxy helper
+  → endpoint module → upstream `fetch`.
+- Don't add docstrings, comments, or refactors to code you didn't change.
+- Don't introduce new dependencies without a clear reason — this proxy is
+  meant to stay tiny.
+- Logging: one-line `[proxy]` / `[server]` / `[usage]` prefixed lines via
+  `console.log` / `console.error`. No logger library.
+- File I/O: prefer `node:fs/promises` for async paths, `readFileSync` only
+  for one-shot startup loads (e.g. `keys.json`).
