@@ -26,28 +26,76 @@ export async function proxyMessages(req, res) {
 
     const outputConfig = isRecord(body.output_config) ? body.output_config : null;
     const thinking = isRecord(body.thinking) ? body.thinking : null;
+    const originalModel = typeof body.model === 'string' ? body.model : null;
     const originalEffort = typeof outputConfig?.effort === 'string' ? outputConfig.effort : null;
+
+    // Resolve the target model + effort purely as locals; nothing on `body`
+    // is mutated until the single write-back step below.
+    let model = originalModel;
     let effort = originalEffort;
-    // `claude-opus-4.7` only supports up to `medium` effort; silently cap when an
-    // explicit effort above `medium` was provided. Do not introduce an effort field
-    // if the caller did not set one.
-    if (
-      body.model === 'claude-opus-4.7' &&
-      originalEffort !== null &&
-      EFFORT_RANK[originalEffort] > EFFORT_RANK.medium
-    ) {
-      effort = 'medium';
-      outputConfig.effort = 'medium';
+
+    // Env-driven sub-model routing for the 1M-context variants. Kept here
+    // (rather than in MODEL_ALIASES) so that all sub-model logic lives in
+    // one place.
+    if (model === 'claude-opus-4.6' && process.env.ENABLE_OPUS_4_6_1M === 'true') {
+      model = 'claude-opus-4.6-1m';
+    } else if (model === 'claude-opus-4.7' && process.env.ENABLE_OPUS_4_7_1M === 'true') {
+      model = 'claude-opus-4.7-1m-internal';
     }
-    // `claude-opus-4.7-1m-internal` only supports up to `xhigh` effort
-    if (
-      body.model === 'claude-opus-4.7-1m-internal' &&
-      originalEffort !== null &&
-      EFFORT_RANK[originalEffort] > EFFORT_RANK.xhigh
+
+    // `claude-opus-4.7` exposes three sub-models keyed by effort:
+    //   - claude-opus-4.7        -> medium
+    //   - claude-opus-4.7-high   -> high
+    //   - claude-opus-4.7-xhigh  -> xhigh
+    // Pick the sub-model from the requested effort (or adaptive thinking)
+    // and coerce the effort to a supported value.
+    if (model === 'claude-opus-4.7') {
+      if (effort === null) {
+        // Adaptive thinking without an explicit effort defaults to `high`.
+        if (thinking?.type === 'adaptive') {
+          model = 'claude-opus-4.7-high';
+        }
+      } else {
+        // Coerce to one of: medium / high / xhigh.
+        if (EFFORT_RANK[effort] <= EFFORT_RANK.medium) {
+          effort = 'medium';
+        } else if (effort === 'max') {
+          effort = 'xhigh';
+        }
+        // Route to the matching sub-model (medium stays on the base model).
+        if (effort === 'high') {
+          model = 'claude-opus-4.7-high';
+        } else if (effort === 'xhigh') {
+          model = 'claude-opus-4.7-xhigh';
+        }
+      }
+    } else if (
+      model === 'claude-opus-4.7-1m-internal' &&
+      effort !== null &&
+      EFFORT_RANK[effort] > EFFORT_RANK.xhigh
     ) {
+      // `claude-opus-4.7-1m-internal` only supports up to `xhigh` effort.
       effort = 'xhigh';
-      outputConfig.effort = 'xhigh';
     }
+
+    // `claude-opus-4.6{,-1m}` and `claude-sonnet-4.6` top out at `high`.
+    if (
+      effort === 'max' &&
+      (model === 'claude-opus-4.6' || model === 'claude-opus-4.6-1m' || model === 'claude-sonnet-4.6')
+    ) {
+      effort = 'high';
+    }
+
+    // Write back: only touch fields the caller actually provided. If the
+    // request had no `output_config`, we leave it absent rather than
+    // synthesising one.
+    if (model !== originalModel) {
+      body.model = model;
+    }
+    if (effort !== originalEffort && outputConfig !== null) {
+      outputConfig.effort = effort;
+    }
+
     const thinkingType = typeof thinking?.type === 'string' ? thinking.type : 'none';
     console.log(
       `[proxy] ${String(body.model)} stream=${Boolean(body.stream)} effort=${originalEffort} thinking=${thinkingType} key=${req.apiKeyId ?? 'anon'}`,

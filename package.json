@@ -8,6 +8,7 @@
     "build": "node scripts/build.js",
     "auth": "node scripts/auth.js",
     "setup-device": "node scripts/setup-device.js",
+    "fetch-models": "node scripts/fetch-models.js",
     "usage-stats": "node scripts/usage-stats.js"
   },
   "engines": {

@@ -8,27 +8,13 @@ export const DEFAULT_COPILOT_API_BASE_URL = 'https://api.githubcopilot.com';
 // API version for the token exchange endpoint (api.github.com)
 export const TOKEN_API_VERSION = '2025-04-01';
 
-let _opus46Value;
-let _opus47Value;
 export const MODEL_ALIASES = {
   'claude-haiku-4-5': 'claude-haiku-4.5',
   'claude-haiku-4-5-20251001': 'claude-haiku-4.5',
   'claude-sonnet-4-6': 'claude-sonnet-4.6',
-  get 'claude-opus-4-6'() {
-    if (_opus46Value === undefined) {
-      _opus46Value = process.env.ENABLE_OPUS_4_6_1M === 'true' ? 'claude-opus-4.6-1m' : 'claude-opus-4.6';
-    }
-    return _opus46Value;
-  },
-  get 'claude-opus-4-7'() {
-    if (_opus47Value === undefined) {
-      _opus47Value = process.env.ENABLE_OPUS_4_7_1M === 'true' ? 'claude-opus-4.7-1m-internal' : 'claude-opus-4.7';
-    }
-    return _opus47Value;
-  },
-  'haiku': 'claude-haiku-4.5',
-  'sonnet': 'claude-sonnet-4.6',
-  get opus() {
-    return this['claude-opus-4-7'];
-  },
+  'claude-opus-4-6': 'claude-opus-4.6',
+  'claude-opus-4-7': 'claude-opus-4.7',
+  haiku: 'claude-haiku-4.5',
+  sonnet: 'claude-sonnet-4.6',
+  opus: 'claude-opus-4.7',
 };
