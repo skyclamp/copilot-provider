@@ -37,9 +37,9 @@ export async function proxyMessages(req, res) {
     // Env-driven sub-model routing for the 1M-context variants. Kept here
     // (rather than in MODEL_ALIASES) so that all sub-model logic lives in
     // one place.
-    if (model === 'claude-opus-4.6' && process.env.ENABLE_OPUS_4_6_1M === 'true') {
+    if (model === 'claude-opus-4.6' && process.env.ROUTE_OPUS_4_6_TO_1M === 'true') {
       model = 'claude-opus-4.6-1m';
-    } else if (model === 'claude-opus-4.7' && process.env.ENABLE_OPUS_4_7_1M === 'true') {
+    } else if (model === 'claude-opus-4.7' && process.env.ROUTE_OPUS_4_7_TO_1M === 'true') {
       model = 'claude-opus-4.7-1m-internal';
     }
 

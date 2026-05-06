@@ -81,8 +81,8 @@ Pattern: snapshot `originalModel` / `originalEffort`, decide the resolved
 - `MODEL_ALIASES` in [src/constants.js](src/constants.js) is a **plain static
   map** — no env-reading getters. Sub-model logic does not belong there.
 - Env-driven 1M routing lives in `messages.js`:
-  - `ENABLE_OPUS_4_6_1M=true` → routes `claude-opus-4.6` to `claude-opus-4.6-1m`
-  - `ENABLE_OPUS_4_7_1M=true` → routes `claude-opus-4.7` to `claude-opus-4.7-1m-internal`
+  - `ROUTE_OPUS_4_6_TO_1M=true` → routes `claude-opus-4.6` to `claude-opus-4.6-1m`
+  - `ROUTE_OPUS_4_7_TO_1M=true` → routes `claude-opus-4.7` to `claude-opus-4.7-1m-internal`
 - `claude-opus-4.7` fans out into three sub-models keyed by effort
   (`medium` → base, `high` → `-high`, `xhigh` → `-xhigh`); `low`/`medium`
   collapse to `medium`, `max` becomes `xhigh`.
@@ -116,8 +116,8 @@ See [.env.example](.env.example). Required for normal operation:
   upstream headers; bump these to track real Copilot Chat releases.
 - `PORT` (default `4141`).
 
-Optional toggles: `DISABLE_INPUT_AUTH`, `ENABLE_OPUS_4_6_1M`,
-`ENABLE_OPUS_4_7_1M`.
+Optional toggles: `DISABLE_INPUT_AUTH`, `GHE_HOST`, `ROUTE_OPUS_4_6_TO_1M`,
+`ROUTE_OPUS_4_7_TO_1M`.
 
 ## Conventions
 

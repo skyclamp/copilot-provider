@@ -5,11 +5,15 @@
  */
 
 import {
-  GITHUB_DEVICE_CODE_URL,
-  GITHUB_ACCESS_TOKEN_URL,
   GITHUB_CLIENT_ID,
   GITHUB_SCOPE,
+  getGitHubDeviceCodeUrl,
+  getGitHubAccessTokenUrl,
+  getGheHost,
 } from '../src/constants.js';
+
+const GITHUB_DEVICE_CODE_URL = getGitHubDeviceCodeUrl();
+const GITHUB_ACCESS_TOKEN_URL = getGitHubAccessTokenUrl();
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -75,7 +79,8 @@ async function pollForToken(deviceCode, interval, expiresIn) {
   }
 
   throw new Error('Device flow expired');
-}
+}t gheHost = getGheHost();
+console.log(`Starting GitHub Device Flow OAuth${gheHost ? ` (GHE: ${gheHost})` : ''}...\n`
 
 // --- Main ---
 

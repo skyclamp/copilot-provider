@@ -1,8 +1,8 @@
 import {
-  GITHUB_API_BASE_URL,
   GITHUB_COPILOT_TOKEN_PATH,
   TOKEN_API_VERSION,
   DEFAULT_COPILOT_API_BASE_URL,
+  getGitHubApiBaseUrl,
 } from './constants.js';
 
 let cached = null;
@@ -26,7 +26,7 @@ async function exchangeToken(githubToken) {
   const chatVersion = process.env.COPILOT_CHAT_VERSION || '0.41.2';
   const vscodeVersion = process.env.VSCODE_VERSION || '1.113.0';
 
-  const response = await fetch(`${GITHUB_API_BASE_URL}${GITHUB_COPILOT_TOKEN_PATH}`, {
+  const response = await fetch(`${getGitHubApiBaseUrl()}${GITHUB_COPILOT_TOKEN_PATH}`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',

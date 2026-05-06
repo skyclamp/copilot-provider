@@ -25,7 +25,9 @@ const COPILOT_INTEGRATION_ID = 'vscode-chat';
 function parseArgs(argv) {
   const args = {
     token: process.env.GITHUB_TOKEN || null,
-    gheHost: null,
+    gheHost: process.env.GHE_HOST
+      ? process.env.GHE_HOST.replace(/^https?:\/\//, '').replace(/\/+$/, '')
+      : null,
     copilotApiBaseUrl: null,
     help: false,
   };
