@@ -19,8 +19,7 @@ import {
   DEFAULT_COPILOT_API_BASE_URL,
 } from '../src/constants.js';
 
-const MODELS_API_VERSION = '2025-10-01';
-const COPILOT_INTEGRATION_ID = 'vscode-chat';
+const MODELS_API_VERSION = process.env.MODELS_API_VERSION || '2026-06-01';
 
 function parseArgs(argv) {
   const args = {
@@ -81,7 +80,6 @@ function getEditorVersions() {
   const chatVersion = process.env.COPILOT_CHAT_VERSION || '0.41.2';
   const vscodeVersion = process.env.VSCODE_VERSION || '1.113.0';
   return {
-    userAgent: `GitHubCopilotChat/${chatVersion}`,
     editorVersion: `vscode/${vscodeVersion}`,
     editorPluginVersion: `copilot-chat/${chatVersion}`,
   };
@@ -103,13 +101,10 @@ function modelsHeaders(copilotToken) {
   const v = getEditorVersions();
   return {
     Authorization: `Bearer ${copilotToken}`,
-    'User-Agent': v.userAgent,
     'X-GitHub-Api-Version': MODELS_API_VERSION,
     'VScode-SessionId': randomUUID(),
     'VScode-MachineId': randomUUID(),
     'Editor-Device-Id': randomUUID(),
-    'Copilot-Integration-Id': COPILOT_INTEGRATION_ID,
-    'OpenAI-Intent': 'model-access',
     'Editor-Version': v.editorVersion,
     'Editor-Plugin-Version': v.editorPluginVersion,
   };

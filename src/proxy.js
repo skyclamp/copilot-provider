@@ -19,15 +19,10 @@ function buildHeaders(copilotToken, device) {
 
   return {
     Authorization: `Bearer ${copilotToken}`,
-    'Content-Type': 'application/json',
-    'User-Agent': `GitHubCopilotChat/${chatVersion}`,
     'X-GitHub-Api-Version': apiVersion,
     'VScode-SessionId': device.vscodeSessionId,
     'VScode-MachineId': device.vscodeMachineId,
     'Editor-Device-Id': device.editorDeviceId,
-    'Copilot-Integration-Id': 'vscode-chat',
-    'OpenAI-Intent': 'conversation-agent',
-    'X-Interaction-Type': 'conversation',
     'X-Request-Id': randomUUID(),
     'Editor-Plugin-Version': `copilot-chat/${chatVersion}`,
     'Editor-Version': `vscode/${vscodeVersion}`,

@@ -12,9 +12,10 @@
 |----------|----------|
 | `POST /v1/messages` | `{api}/v1/messages` |
 | `POST /v1/responses` | `{api}/responses` |
+| `POST /v1/chat/completions` | `{api}/chat/completions` |
 | `POST /v1/embeddings` | `{api}/embeddings` |
 
-`/v1/responses` 和 `/v1/embeddings` 的上游路径无 `/v1` 前缀。
+`/v1/responses`、`/v1/chat/completions` 和 `/v1/embeddings` 的上游路径无 `/v1` 前缀。
 
 其他所有请求 → 404。
 
@@ -22,7 +23,7 @@
 
 仅 `/v1/messages` 做 model 名称映射（`MODEL_ALIASES`），其余端点原样透传 model。
 
-`/v1/messages` 会识别 `anthropic-beta` header 中的 `context-1m-2025-08-07`，对 `claude-opus-4-6` 自动替换为 `claude-opus-4.6-1m` 并从 header 中移除该 beta flag。
+`/v1/messages` 对 `anthropic-beta` header 应用白名单：只保留前缀匹配 `interleaved-thinking`、`context-management`、`advanced-tool-use` 的 flag（允许任意 date 后缀），其余静默丢弃。白名单来源于 vscode 代码库的 `src/vs/platform/agentHost/node/claude/anthropicBetas.ts`。
 
 ## 流式转发
 

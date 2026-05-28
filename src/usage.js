@@ -137,6 +137,14 @@ export class SSEUsageParser {
     if (responseObj) {
       if (responseObj.model) this.model = responseObj.model;
       if (responseObj.usage) mergeDeep(this.usage, responseObj.usage);
+      return;
+    }
+
+    // OpenAI /v1/chat/completions — model is on every chunk; usage appears
+    // on the final chunk when stream_options.include_usage is set.
+    if (data.object === 'chat.completion.chunk' || data.object === 'chat.completion') {
+      if (data.model) this.model = data.model;
+      if (data.usage) mergeDeep(this.usage, data.usage);
     }
   }
 

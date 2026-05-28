@@ -1,4 +1,5 @@
 import express from 'express';
+import { proxyChatCompletions } from './chat-completions.js';
 import { proxyEmbeddings } from './embeddings.js';
 import { proxyMessages } from './messages.js';
 import { proxyResponses } from './responses.js';
@@ -54,9 +55,10 @@ app.head('/', (req, res) => {
   res.status(200).end();
 });
 
-// POST /v1/messages, /v1/responses, and /v1/embeddings — proxy to Copilot API
+// POST /v1/messages, /v1/responses, /v1/chat/completions, and /v1/embeddings — proxy to Copilot API
 app.post('/v1/messages', validateMessagesApiKey, proxyMessages);
 app.post('/v1/responses', validateOpenAIAuthorization, proxyResponses);
+app.post('/v1/chat/completions', validateOpenAIAuthorization, proxyChatCompletions);
 app.post('/v1/embeddings', validateOpenAIAuthorization, proxyEmbeddings);
 
 // Everything else — 404 + log

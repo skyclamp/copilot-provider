@@ -3,13 +3,30 @@ import { pickHeaderExtras, pipeAndExtractUsage } from './usage.js';
 
 const EFFORT_RANK = { low: 0, medium: 1, high: 2, xhigh: 3, max: 4 };
 
-// Beta flags the upstream Copilot endpoint does not accept. Filtered out
-// of the `anthropic-beta` request header before forwarding. Add new
-// entries here as they are discovered.
-const ANTHROPIC_BETA_BLACKLIST = new Set([
-  'context-1m-2025-08-07',
-  'advisor-tool-2026-03-01',
-]);
+// Prefixes of `anthropic-beta` flags the upstream Copilot endpoint accepts.
+// Sourced from the vscode codebase at
+// `src/vs/platform/agentHost/node/claude/anthropicBetas.ts`:
+//
+//   const SUPPORTED_ANTHROPIC_BETAS: readonly string[] = [
+//     'interleaved-thinking',
+//     'context-management',
+//     'advanced-tool-use',
+//   ];
+//
+// Entries are matched as prefixes so any date suffix (e.g.
+// `interleaved-thinking-2025-05-14`) is accepted. Anything else is
+// silently dropped before forwarding.
+const ANTHROPIC_BETA_PREFIX_WHITELIST = [
+  'interleaved-thinking',
+  'context-management',
+  'advanced-tool-use',
+];
+
+function isAllowedAnthropicBeta(flag) {
+  return ANTHROPIC_BETA_PREFIX_WHITELIST.some(
+    prefix => flag === prefix || flag.startsWith(`${prefix}-`),
+  );
+}
 
 export async function proxyMessages(req, res) {
   try {
@@ -20,11 +37,11 @@ export async function proxyMessages(req, res) {
       body.model = mapModel(body.model);
     }
 
-    // Drop blacklisted beta flags; forward the rest unchanged.
+    // Keep only whitelisted beta flags; drop everything else silently.
     const upstreamBeta = req.headers['anthropic-beta']
       ?.split(',')
       .map(h => h.trim())
-      .filter(h => h && !ANTHROPIC_BETA_BLACKLIST.has(h))
+      .filter(h => h && isAllowedAnthropicBeta(h))
       .join(',');
     if (upstreamBeta) {
       headers['anthropic-beta'] = upstreamBeta;
