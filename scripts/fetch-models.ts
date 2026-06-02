@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Standalone Copilot models fetcher.
  *
@@ -7,7 +7,7 @@
  * JSON. Supports github.com (default) and GitHub Enterprise (--ghe-host).
  *
  * Usage:
- *   bun run scripts/fetch-models.js --token <github-token> [OPTIONS]
+ *   bun run scripts/fetch-models.ts --token <github-token> [OPTIONS]
  */
 
 import { randomUUID } from 'node:crypto';
@@ -17,15 +17,22 @@ import {
   GITHUB_COPILOT_TOKEN_PATH,
   TOKEN_API_VERSION,
   DEFAULT_COPILOT_API_BASE_URL,
-} from '../src/constants.js';
+} from '../src/constants.ts';
 
-const MODELS_API_VERSION = process.env.MODELS_API_VERSION || '2026-06-01';
+const MODELS_API_VERSION = Bun.env.MODELS_API_VERSION || '2026-06-01';
 
-function parseArgs(argv) {
-  const args = {
-    token: process.env.GITHUB_TOKEN || null,
-    gheHost: process.env.GHE_HOST
-      ? process.env.GHE_HOST.replace(/^https?:\/\//, '').replace(/\/+$/, '')
+type Args = {
+  token: string | null;
+  gheHost: string | null;
+  copilotApiBaseUrl: string | null;
+  help: boolean;
+};
+
+function parseArgs(argv: string[]): Args {
+  const args: Args = {
+    token: Bun.env.GITHUB_TOKEN || null,
+    gheHost: Bun.env.GHE_HOST
+      ? Bun.env.GHE_HOST.replace(/^https?:\/\//, '').replace(/\/+$/, '')
       : null,
     copilotApiBaseUrl: null,
     help: false,
@@ -49,9 +56,9 @@ function parseArgs(argv) {
   return args;
 }
 
-function printHelp() {
+function printHelp(): void {
   console.log([
-    'Usage: bun run scripts/fetch-models.js --token <github-token> [OPTIONS]',
+    'Usage: bun run scripts/fetch-models.ts --token <github-token> [OPTIONS]',
     '',
     'Exchanges a GitHub access token for a Copilot token, prints that response',
     'as JSON, then calls the Copilot /models endpoint and prints that as JSON.',
@@ -67,25 +74,22 @@ function printHelp() {
   ].join('\n'));
 }
 
-function getGitHubApiBaseUrl(gheHost) {
-  if (gheHost) {
-    // GHE Copilot token endpoint lives on the api.<host> subdomain,
-    // e.g. https://api.ghe.example.com/copilot_internal/v2/token
-    return `https://api.${gheHost}`;
-  }
+function getGitHubApiBaseUrl(gheHost: string | null): string {
+  if (gheHost) return `https://api.${gheHost}`;
   return GITHUB_API_BASE_URL;
 }
 
-function getEditorVersions() {
-  const chatVersion = process.env.COPILOT_CHAT_VERSION || '0.41.2';
-  const vscodeVersion = process.env.VSCODE_VERSION || '1.113.0';
+function getEditorVersions(): { editorVersion: string; editorPluginVersion: string; userAgent: string } {
+  const chatVersion = Bun.env.COPILOT_CHAT_VERSION || '0.41.2';
+  const vscodeVersion = Bun.env.VSCODE_VERSION || '1.113.0';
   return {
     editorVersion: `vscode/${vscodeVersion}`,
     editorPluginVersion: `copilot-chat/${chatVersion}`,
+    userAgent: `GitHubCopilotChat/${chatVersion}`,
   };
 }
 
-function tokenExchangeHeaders(githubToken) {
+function tokenExchangeHeaders(githubToken: string): Record<string, string> {
   const v = getEditorVersions();
   return {
     Accept: 'application/json',
@@ -97,7 +101,7 @@ function tokenExchangeHeaders(githubToken) {
   };
 }
 
-function modelsHeaders(copilotToken) {
+function modelsHeaders(copilotToken: string): Record<string, string> {
   const v = getEditorVersions();
   return {
     Authorization: `Bearer ${copilotToken}`,
@@ -110,7 +114,9 @@ function modelsHeaders(copilotToken) {
   };
 }
 
-async function exchangeForCopilotToken({ githubApiBaseUrl, githubToken }) {
+type CopilotTokenExchange = { token: string; endpoints?: { api?: string } };
+
+async function exchangeForCopilotToken({ githubApiBaseUrl, githubToken }: { githubApiBaseUrl: string; githubToken: string }): Promise<CopilotTokenExchange> {
   const response = await fetch(`${githubApiBaseUrl}${GITHUB_COPILOT_TOKEN_PATH}`, {
     method: 'GET',
     headers: tokenExchangeHeaders(githubToken),
@@ -123,7 +129,7 @@ async function exchangeForCopilotToken({ githubApiBaseUrl, githubToken }) {
     );
   }
 
-  let payload;
+  let payload: CopilotTokenExchange;
   try {
     payload = JSON.parse(text);
   } catch {
@@ -137,7 +143,7 @@ async function exchangeForCopilotToken({ githubApiBaseUrl, githubToken }) {
   return payload;
 }
 
-async function fetchModels({ copilotApiBaseUrl, copilotToken }) {
+async function fetchModels({ copilotApiBaseUrl, copilotToken }: { copilotApiBaseUrl: string; copilotToken: string }): Promise<unknown> {
   const response = await fetch(`${copilotApiBaseUrl}/models`, {
     method: 'GET',
     headers: modelsHeaders(copilotToken),
@@ -157,13 +163,11 @@ async function fetchModels({ copilotApiBaseUrl, copilotToken }) {
   }
 }
 
-// --- Main ---
-
-let args;
+let args: Args;
 try {
   args = parseArgs(process.argv.slice(2));
 } catch (err) {
-  console.error(err.message);
+  console.error((err as Error).message);
   printHelp();
   process.exit(2);
 }

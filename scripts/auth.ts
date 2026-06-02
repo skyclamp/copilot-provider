@@ -1,7 +1,8 @@
+#!/usr/bin/env bun
 /**
  * GitHub Device Flow OAuth — prints GITHUB_TOKEN for .env
  *
- * Usage: bun run scripts/auth.js
+ * Usage: bun run scripts/auth.ts
  */
 
 import {
@@ -10,16 +11,32 @@ import {
   getGitHubDeviceCodeUrl,
   getGitHubAccessTokenUrl,
   getGheHost,
-} from '../src/constants.js';
+} from '../src/constants.ts';
 
 const GITHUB_DEVICE_CODE_URL = getGitHubDeviceCodeUrl();
 const GITHUB_ACCESS_TOKEN_URL = getGitHubAccessTokenUrl();
 
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
+type DeviceFlowStart = {
+  device_code: string;
+  user_code: string;
+  verification_uri: string;
+  verification_uri_complete?: string;
+  expires_in: number;
+  interval: number;
+};
+
+type DeviceFlowPoll = {
+  access_token?: string;
+  error?: string;
+  error_description?: string;
+  interval?: number;
+};
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(r => setTimeout(r, ms));
 }
 
-async function startDeviceFlow() {
+async function startDeviceFlow(): Promise<DeviceFlowStart> {
   const response = await fetch(GITHUB_DEVICE_CODE_URL, {
     method: 'POST',
     headers: {
@@ -32,14 +49,14 @@ async function startDeviceFlow() {
     }),
   });
 
-  const payload = await response.json();
+  const payload = (await response.json()) as DeviceFlowStart & { error?: string };
   if (!response.ok) {
     throw new Error(`Device flow failed: ${response.status} ${JSON.stringify(payload)}`);
   }
   return payload;
 }
 
-async function pollForToken(deviceCode, interval, expiresIn) {
+async function pollForToken(deviceCode: string, interval: number, expiresIn: number): Promise<string> {
   const deadline = Date.now() + expiresIn * 1000;
   let pollInterval = interval || 5;
 
@@ -59,7 +76,7 @@ async function pollForToken(deviceCode, interval, expiresIn) {
       }),
     });
 
-    const payload = await response.json();
+    const payload = (await response.json()) as DeviceFlowPoll;
 
     if (payload.access_token) {
       return payload.access_token;
@@ -79,12 +96,10 @@ async function pollForToken(deviceCode, interval, expiresIn) {
   }
 
   throw new Error('Device flow expired');
-}t gheHost = getGheHost();
-console.log(`Starting GitHub Device Flow OAuth${gheHost ? ` (GHE: ${gheHost})` : ''}...\n`
+}
 
-// --- Main ---
-
-console.log('Starting GitHub Device Flow OAuth...\n');
+const gheHost = getGheHost();
+console.log(`Starting GitHub Device Flow OAuth${gheHost ? ` (GHE: ${gheHost})` : ''}...\n`);
 
 const flow = await startDeviceFlow();
 

@@ -1,25 +1,26 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 // Aggregate usage JSONL logs under ./usage/ and print per-key statistics.
 //
 // Each log line has shape { ts: <epoch ms>, model: <string|null>, usage: {...} }
 // where `usage` is the raw provider usage payload (Anthropic or OpenAI).
 //
 // Usage:
-//   node scripts/usage-stats.js                   # all keys, all months
-//   node scripts/usage-stats.js --month 2026-04
-//   node scripts/usage-stats.js --key claude-01
-//   node scripts/usage-stats.js --by-model
-//   node scripts/usage-stats.js --json
+//   bun run scripts/usage-stats.ts                   # all keys, all months
+//   bun run scripts/usage-stats.ts --month 2026-04
+//   bun run scripts/usage-stats.ts --key claude-01
+//   bun run scripts/usage-stats.ts --by-model
+//   bun run scripts/usage-stats.ts --json
 
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, resolve, basename } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
+const MODULE_DIR = dirname(new URL(import.meta.url).pathname);
 const USAGE_DIR = resolve(MODULE_DIR, '..', 'usage');
 
-function parseArgs(argv) {
-  const args = { month: null, key: null, json: false, byModel: false };
+type Args = { month: string | null; key: string | null; json: boolean; byModel: boolean };
+
+function parseArgs(argv: string[]): Args {
+  const args: Args = { month: null, key: null, json: false, byModel: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--month') args.month = argv[++i];
@@ -27,7 +28,7 @@ function parseArgs(argv) {
     else if (a === '--json') args.json = true;
     else if (a === '--by-model') args.byModel = true;
     else if (a === '-h' || a === '--help') {
-      console.log('Usage: node scripts/usage-stats.js [--month YYYY-MM] [--key <id>] [--by-model] [--json]');
+      console.log('Usage: bun run scripts/usage-stats.ts [--month YYYY-MM] [--key <id>] [--by-model] [--json]');
       process.exit(0);
     } else {
       console.error(`Unknown argument: ${a}`);
@@ -37,22 +38,23 @@ function parseArgs(argv) {
   return args;
 }
 
-// Parse "claude-01-2026-04.jsonl" -> { keyId, month }
-function parseLogName(filename) {
+type LogEntry = { keyId: string; month: string; path: string };
+
+function parseLogName(filename: string): { keyId: string; month: string } | null {
   const m = /^(.+)-(\d{4}-\d{2})\.jsonl$/.exec(filename);
   if (!m) return null;
   return { keyId: m[1], month: m[2] };
 }
 
-async function listLogs({ keyFilter, monthFilter }) {
-  let files;
+async function listLogs({ keyFilter, monthFilter }: { keyFilter: string | null; monthFilter: string | null }): Promise<LogEntry[]> {
+  let files: string[];
   try {
     files = await readdir(USAGE_DIR);
   } catch (err) {
-    if (err.code === 'ENOENT') return [];
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
     throw err;
   }
-  const logs = [];
+  const logs: LogEntry[] = [];
   for (const f of files) {
     if (!f.endsWith('.jsonl')) continue;
     const parsed = parseLogName(f);
@@ -64,11 +66,9 @@ async function listLogs({ keyFilter, monthFilter }) {
   return logs;
 }
 
-// Top-level fields that duplicate nested breakdowns and are not used for billing.
 const SKIP_USAGE_FIELDS = new Set(['cache_creation_input_tokens']);
 
-// Flatten nested usage objects to dotted field names while summing numbers.
-function addUsage(bucket, usage, prefix = '') {
+function addUsage(bucket: Record<string, number>, usage: any, prefix = ''): void {
   if (!usage || typeof usage !== 'object') return;
   for (const [k, v] of Object.entries(usage)) {
     const name = prefix ? `${prefix}.${k}` : k;
@@ -81,11 +81,15 @@ function addUsage(bucket, usage, prefix = '') {
   }
 }
 
-function emptyBucket() {
+type Bucket = { requests: number; first_ts: number | null; last_ts: number | null; usage: Record<string, number> };
+
+function emptyBucket(): Bucket {
   return { requests: 0, first_ts: null, last_ts: null, usage: {} };
 }
 
-function applyEntry(bucket, entry) {
+type Entry = { ts?: number; model?: string | null; usage?: any };
+
+function applyEntry(bucket: Bucket, entry: Entry): void {
   bucket.requests += 1;
   if (typeof entry.ts === 'number') {
     if (bucket.first_ts == null || entry.ts < bucket.first_ts) bucket.first_ts = entry.ts;
@@ -94,15 +98,15 @@ function applyEntry(bucket, entry) {
   addUsage(bucket.usage, entry.usage);
 }
 
-async function readEntries(path) {
+async function readEntries(path: string): Promise<Entry[]> {
   const text = await readFile(path, 'utf-8');
-  const entries = [];
+  const entries: Entry[] = [];
   for (const line of text.split('\n')) {
     if (!line) continue;
     try {
       entries.push(JSON.parse(line));
     } catch (err) {
-      console.warn(`[stats] skipping malformed line in ${basename(path)}: ${err.message}`);
+      console.warn(`[stats] skipping malformed line in ${basename(path)}: ${(err as Error).message}`);
     }
   }
   return entries;
@@ -114,13 +118,13 @@ const OPENAI_BILLING_USAGE_FIELDS = new Set([
   'output_tokens',
 ]);
 
-function formatNumber(n) {
+function formatNumber(n: unknown): string {
   if (typeof n !== 'number' || !Number.isFinite(n)) return String(n);
   return n.toLocaleString('en-US');
 }
 
-function formatBucket(bucket, { usageFields = null, withCommas = false } = {}) {
-  const fmt = withCommas ? formatNumber : (v) => v;
+function formatBucket(bucket: Bucket, { usageFields = null, withCommas = false }: { usageFields?: Set<string> | null; withCommas?: boolean } = {}): string {
+  const fmt = withCommas ? formatNumber : (v: unknown) => v;
   const pairs = Object.entries(bucket.usage)
     .filter(([k]) => !usageFields || usageFields.has(k))
     .sort(([a], [b]) => a.localeCompare(b))
@@ -128,7 +132,7 @@ function formatBucket(bucket, { usageFields = null, withCommas = false } = {}) {
   return `requests=${fmt(bucket.requests)} ${pairs.join(' ')}`.trimEnd();
 }
 
-function claudeFamily(model) {
+function claudeFamily(model: string | null | undefined): string | null {
   if (!model || typeof model !== 'string') return null;
   if (model.includes('opus')) return 'opus';
   if (model.includes('sonnet')) return 'sonnet';
@@ -136,8 +140,8 @@ function claudeFamily(model) {
   return null;
 }
 
-// Pricing per million tokens (USD) for supported Claude models.
-const CLAUDE_PRICING = {
+type ClaudePricing = { input: number; output: number; cache5m: number; cache1h: number; cacheRead: number };
+const CLAUDE_PRICING: Record<string, ClaudePricing> = {
   'claude-haiku-4.5': { input: 1.0, output: 5.0, cache5m: 1.25, cache1h: 2.0, cacheRead: 0.10 },
   'claude-sonnet-4.6': { input: 3.0, output: 15.0, cache5m: 3.75, cache1h: 6.0, cacheRead: 0.30 },
   'claude-opus-4.6': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
@@ -146,10 +150,11 @@ const CLAUDE_PRICING = {
   'claude-opus-4.7-high': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
   'claude-opus-4.7-xhigh': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
   'claude-opus-4.7-1m-internal': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
+  'claude-opus-4.8': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
 };
 
-function computeEntryCost(entry) {
-  const pricing = CLAUDE_PRICING[entry.model];
+function computeEntryCost(entry: Entry): number {
+  const pricing = entry.model ? CLAUDE_PRICING[entry.model] : undefined;
   if (!pricing) return 0;
   const u = entry.usage || {};
   const inputTokens = u.input_tokens || 0;
@@ -166,16 +171,16 @@ function computeEntryCost(entry) {
   ) / 1_000_000;
 }
 
-// Pricing per million tokens (USD) for supported OpenAI models.
-const OPENAI_PRICING = {
+type OpenAIPricing = { input: number; cachedInput: number; output: number };
+const OPENAI_PRICING: Record<string, OpenAIPricing> = {
   'gpt-5.5': { input: 5.00, cachedInput: 0.50, output: 30.00 },
   'gpt-5.4': { input: 2.50, cachedInput: 0.25, output: 15.00 },
   'gpt-5.3-codex': { input: 1.75, cachedInput: 0.175, output: 14.00 },
   'gpt-5.4-mini': { input: 0.75, cachedInput: 0.075, output: 4.50 },
 };
 
-function computeOpenAIEntryCost(entry) {
-  const pricing = OPENAI_PRICING[entry.model];
+function computeOpenAIEntryCost(entry: Entry): number {
+  const pricing = entry.model ? OPENAI_PRICING[entry.model] : undefined;
   if (!pricing) return 0;
   const u = entry.usage || {};
   const inputTokens = u.input_tokens || 0;
@@ -189,13 +194,13 @@ function computeOpenAIEntryCost(entry) {
   ) / 1_000_000;
 }
 
-function formatCost(cost) {
+function formatCost(cost: number): string {
   if (cost < 0.01) return `$${cost.toFixed(6)}`;
   if (cost < 1) return `$${cost.toFixed(4)}`;
   return `$${cost.toFixed(2)}`;
 }
 
-async function main() {
+async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const logs = await listLogs({ keyFilter: args.key, monthFilter: args.month });
   if (logs.length === 0) {
@@ -203,41 +208,39 @@ async function main() {
     return;
   }
 
-  // byKey: Map<keyId, Map<month, Map<bucketKey, bucket>>>
-  const byKey = new Map();
-  // claudeCostByKeyMonthBucket: Map<keyId, Map<month, Map<bucketKey, number>>>
-  const claudeCostByKeyMonthBucket = new Map();
-  // openaiCostByKeyMonth: Map<keyId, Map<month, number>>
-  const openaiCostByKeyMonth = new Map();
+  const byKey = new Map<string, Map<string, Map<string, Bucket>>>();
+  const claudeCostByKeyMonthBucket = new Map<string, Map<string, Map<string, number>>>();
+  const openaiCostByKeyMonth = new Map<string, Map<string, number>>();
+
   for (const log of logs) {
     const entries = await readEntries(log.path);
-    const keyMap = byKey.get(log.keyId) || byKey.set(log.keyId, new Map()).get(log.keyId);
-    const monthMap = keyMap.get(log.month) || keyMap.set(log.month, new Map()).get(log.month);
+    const keyMap = byKey.get(log.keyId) || byKey.set(log.keyId, new Map()).get(log.keyId)!;
+    const monthMap = keyMap.get(log.month) || keyMap.set(log.month, new Map()).get(log.month)!;
     for (const entry of entries) {
       const family = claudeFamily(entry.model);
-      let bk;
+      let bk: string;
       if (args.byModel) bk = entry.model || 'unknown';
       else if (family) bk = `(claude-${family})`;
       else bk = '(total)';
-      const bucket = monthMap.get(bk) || monthMap.set(bk, emptyBucket()).get(bk);
+      const bucket = monthMap.get(bk) || monthMap.set(bk, emptyBucket()).get(bk)!;
       applyEntry(bucket, entry);
       const cost = computeEntryCost(entry);
       if (cost > 0) {
         const ck = claudeCostByKeyMonthBucket.get(log.keyId)
-          || claudeCostByKeyMonthBucket.set(log.keyId, new Map()).get(log.keyId);
-        const cm = ck.get(log.month) || ck.set(log.month, new Map()).get(log.month);
+          || claudeCostByKeyMonthBucket.set(log.keyId, new Map()).get(log.keyId)!;
+        const cm = ck.get(log.month) || ck.set(log.month, new Map()).get(log.month)!;
         cm.set(bk, (cm.get(bk) || 0) + cost);
       }
       const openaiCost = computeOpenAIEntryCost(entry);
       if (openaiCost > 0) {
-        const ok = openaiCostByKeyMonth.get(log.keyId) || openaiCostByKeyMonth.set(log.keyId, new Map()).get(log.keyId);
+        const ok = openaiCostByKeyMonth.get(log.keyId) || openaiCostByKeyMonth.set(log.keyId, new Map()).get(log.keyId)!;
         ok.set(log.month, (ok.get(log.month) || 0) + openaiCost);
       }
     }
   }
 
   if (args.json) {
-    const out = {};
+    const out: Record<string, Record<string, any>> = {};
     for (const [keyId, keyMap] of byKey) {
       out[keyId] = {};
       for (const [month, monthMap] of keyMap) {
@@ -259,17 +262,17 @@ async function main() {
 
   for (const keyId of Array.from(byKey.keys()).sort()) {
     console.log(`\n=== ${keyId} ===`);
-    const keyMap = byKey.get(keyId);
+    const keyMap = byKey.get(keyId)!;
     for (const month of Array.from(keyMap.keys()).sort()) {
       console.log(`  ${month}`);
-      const monthMap = keyMap.get(month);
+      const monthMap = keyMap.get(month)!;
       const openaiCost = openaiCostByKeyMonth.get(keyId)?.get(month) || 0;
       const claudeCostMap = claudeCostByKeyMonthBucket.get(keyId)?.get(month);
       for (const bk of Array.from(monthMap.keys()).sort()) {
         const usageFields = keyId.startsWith('openai-') && bk === '(total)'
           ? OPENAI_BILLING_USAGE_FIELDS
           : null;
-        console.log(`    ${bk}: ${formatBucket(monthMap.get(bk), { usageFields, withCommas: true })}`);
+        console.log(`    ${bk}: ${formatBucket(monthMap.get(bk)!, { usageFields, withCommas: true })}`);
         const bucketCost = claudeCostMap?.get(bk) || 0;
         if (bucketCost > 0) {
           const label = bk.startsWith('(') && bk.endsWith(')') ? bk.slice(1, -1) : bk;

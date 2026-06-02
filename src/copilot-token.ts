@@ -3,28 +3,29 @@ import {
   TOKEN_API_VERSION,
   DEFAULT_COPILOT_API_BASE_URL,
   getGitHubApiBaseUrl,
-} from './constants.js';
+} from './constants.ts';
+import type { CopilotTokenResponse } from './types.ts';
 
-let cached = null;
+let cached: CopilotTokenResponse | null = null;
 
-function nowInSeconds() {
+function nowInSeconds(): number {
   return Math.floor(Date.now() / 1000);
 }
 
-function isTokenValid(token) {
+function isTokenValid(token: CopilotTokenResponse | null): token is CopilotTokenResponse {
   if (!token?.token || !token?.expires_at) return false;
   return token.expires_at > nowInSeconds() + 60;
 }
 
-function readGitHubToken() {
-  const token = process.env.GITHUB_TOKEN;
-  if (!token) throw new Error('GITHUB_TOKEN not set in .env. Run: bun run scripts/auth.js');
+function readGitHubToken(): string {
+  const token = Bun.env.GITHUB_TOKEN;
+  if (!token) throw new Error('GITHUB_TOKEN not set in .env. Run: bun run auth');
   return token;
 }
 
-async function exchangeToken(githubToken) {
-  const chatVersion = process.env.COPILOT_CHAT_VERSION || '0.41.2';
-  const vscodeVersion = process.env.VSCODE_VERSION || '1.113.0';
+async function exchangeToken(githubToken: string): Promise<CopilotTokenResponse> {
+  const chatVersion = Bun.env.COPILOT_CHAT_VERSION || '0.41.2';
+  const vscodeVersion = Bun.env.VSCODE_VERSION || '1.113.0';
 
   const response = await fetch(`${getGitHubApiBaseUrl()}${GITHUB_COPILOT_TOKEN_PATH}`, {
     method: 'GET',
@@ -43,14 +44,14 @@ async function exchangeToken(githubToken) {
     throw new Error(`Token exchange failed: ${response.status} ${response.statusText} - ${body}`);
   }
 
-  const payload = await response.json();
+  const payload = (await response.json()) as CopilotTokenResponse;
   if (!payload?.token) {
     throw new Error('Copilot token response missing token field');
   }
   return payload;
 }
 
-export async function getCopilotToken() {
+export async function getCopilotToken(): Promise<CopilotTokenResponse> {
   if (isTokenValid(cached)) return cached;
 
   const githubToken = readGitHubToken();
@@ -60,6 +61,6 @@ export async function getCopilotToken() {
   return token;
 }
 
-export function getCopilotApiBaseUrl(tokenResponse) {
+export function getCopilotApiBaseUrl(tokenResponse: CopilotTokenResponse): string {
   return tokenResponse.endpoints?.api?.replace(/\/+$/, '') || DEFAULT_COPILOT_API_BASE_URL;
 }
