@@ -82,6 +82,14 @@ export async function proxyMessages(ctx: RequestContext): Promise<Response> {
       effort = 'high';
     }
 
+    if (
+      model === 'claude-opus-4.8' &&
+      effort !== null &&
+      EFFORT_RANK[effort] > EFFORT_RANK.medium
+    ) {
+      effort = 'medium';
+    }
+
     if (model !== originalModel) {
       body.model = model;
     }
