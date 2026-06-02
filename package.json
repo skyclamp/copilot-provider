@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "start": "bun run index.ts",
+    "build": "bun build index.ts --target=bun --outfile=dist/copilot-provider.js",
     "dev": "bun --watch run index.ts",
     "auth": "bun run scripts/auth.ts",
     "setup-device": "bun run scripts/setup-device.ts",
