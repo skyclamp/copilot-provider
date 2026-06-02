@@ -30,12 +30,9 @@ async function exchangeToken(githubToken: string): Promise<CopilotTokenResponse>
   const response = await fetch(`${getGitHubApiBaseUrl()}${GITHUB_COPILOT_TOKEN_PATH}`, {
     method: 'GET',
     headers: {
-      Accept: 'application/json',
       Authorization: `token ${githubToken}`,
-      'User-Agent': `GitHubCopilotChat/${chatVersion}`,
       'X-GitHub-Api-Version': TOKEN_API_VERSION,
-      'Editor-Plugin-Version': `copilot-chat/${chatVersion}`,
-      'Editor-Version': `vscode/${vscodeVersion}`,
+      'Editor-Device-Id': Bun.env.EDITOR_DEVICE_ID || '',
     },
   });
 

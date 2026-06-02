@@ -27,7 +27,6 @@ function buildHeaders(copilotToken: string, device: DeviceInfo): Record<string, 
   return {
     Authorization: `Bearer ${copilotToken}`,
     'X-GitHub-Api-Version': apiVersion,
-    'VScode-SessionId': device.vscodeSessionId,
     'VScode-MachineId': device.vscodeMachineId,
     'Editor-Device-Id': device.editorDeviceId,
     'X-Request-Id': randomUUID(),

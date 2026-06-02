@@ -79,25 +79,21 @@ function getGitHubApiBaseUrl(gheHost: string | null): string {
   return GITHUB_API_BASE_URL;
 }
 
-function getEditorVersions(): { editorVersion: string; editorPluginVersion: string; userAgent: string } {
+function getEditorVersions(): { editorVersion: string; editorPluginVersion: string } {
   const chatVersion = Bun.env.COPILOT_CHAT_VERSION || '0.41.2';
   const vscodeVersion = Bun.env.VSCODE_VERSION || '1.113.0';
   return {
     editorVersion: `vscode/${vscodeVersion}`,
     editorPluginVersion: `copilot-chat/${chatVersion}`,
-    userAgent: `GitHubCopilotChat/${chatVersion}`,
   };
 }
 
 function tokenExchangeHeaders(githubToken: string): Record<string, string> {
   const v = getEditorVersions();
   return {
-    Accept: 'application/json',
     Authorization: `token ${githubToken}`,
-    'User-Agent': v.userAgent,
     'X-GitHub-Api-Version': TOKEN_API_VERSION,
-    'Editor-Version': v.editorVersion,
-    'Editor-Plugin-Version': v.editorPluginVersion,
+    'Editor-Device-Id': Bun.env.EDITOR_DEVICE_ID || '',
   };
 }
 
@@ -106,7 +102,6 @@ function modelsHeaders(copilotToken: string): Record<string, string> {
   return {
     Authorization: `Bearer ${copilotToken}`,
     'X-GitHub-Api-Version': MODELS_API_VERSION,
-    'VScode-SessionId': randomUUID(),
     'VScode-MachineId': randomUUID(),
     'Editor-Device-Id': randomUUID(),
     'Editor-Version': v.editorVersion,
