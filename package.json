@@ -10,6 +10,7 @@
     "auth": "bun run scripts/auth.ts",
     "setup-device": "bun run scripts/setup-device.ts",
     "gen-keys": "bun run scripts/gen-keys.ts",
+    "pack-src": "bun run scripts/pack-src.ts",
     "fetch-models": "bun run scripts/fetch-models.ts",
     "usage-stats": "bun run scripts/usage-stats.ts",
     "typecheck": "tsc --noEmit"
