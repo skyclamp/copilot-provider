@@ -53,6 +53,7 @@ type UsageRecord = {
 
 export async function recordUsage(keyId: string | null | undefined, { model, usage, extras }: UsageRecord): Promise<void> {
   if (!keyId) return;
+  if (Bun.env.DISABLE_USAGE_LOGGING === 'true') return;
   const now = new Date();
   const path = usageLogPath(keyId, currentMonth(now));
   const entry = {
@@ -174,6 +175,10 @@ export function pipeAndExtractUsage(
 
   if (!upstream.body) {
     return new Response(null, { status, headers: respHeaders });
+  }
+
+  if (Bun.env.DISABLE_USAGE_LOGGING === 'true') {
+    return new Response(upstream.body, { status, headers: respHeaders });
   }
 
   const [clientStream, parseStream] = upstream.body.tee();
