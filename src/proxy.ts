@@ -78,8 +78,6 @@ export function buildResponseHeaders(upstream: Response): Headers {
   const out = new Headers();
   const requestId = upstream.headers.get('x-request-id');
   if (requestId) out.set('x-request-id', requestId);
-  const githubRequestId = upstream.headers.get('x-github-request-id');
-  if (githubRequestId) out.set('x-github-request-id', githubRequestId);
   const contentType = upstream.headers.get('content-type');
   if (contentType) out.set('Content-Type', contentType);
   return out;
