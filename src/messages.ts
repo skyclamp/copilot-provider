@@ -22,7 +22,7 @@ function isAllowedAnthropicBeta(flag: string): boolean {
 export async function proxyMessages(ctx: RequestContext): Promise<Response> {
   try {
     const { req, apiKeyId } = ctx;
-    const { apiBase, headers } = await getProxyContext();
+    const { apiBase, headers } = await getProxyContext(req);
     const body: Record<string, unknown> = isRecord(ctx.body) ? { ...ctx.body } : {};
 
     if (typeof body.model === 'string') {

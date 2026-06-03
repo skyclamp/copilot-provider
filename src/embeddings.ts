@@ -4,8 +4,8 @@ import type { RequestContext } from './types.ts';
 
 export async function proxyEmbeddings(ctx: RequestContext): Promise<Response> {
   try {
-    const { apiKeyId } = ctx;
-    const { apiBase, headers } = await getProxyContext();
+    const { req, apiKeyId } = ctx;
+    const { apiBase, headers } = await getProxyContext(req);
     const body: Record<string, unknown> = isRecord(ctx.body) ? { ...ctx.body } : {};
 
     const inputCount = Array.isArray(body.input)

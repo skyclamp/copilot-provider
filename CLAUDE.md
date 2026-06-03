@@ -127,7 +127,7 @@ Two-sided:
 
 See [.env.example](.env.example). Required for normal operation:
 
-- `GITHUB_TOKEN`, `VSCODE_SESSION_ID`, `VSCODE_MACHINE_ID`,
+- `GITHUB_TOKEN`, `VSCODE_MACHINE_ID`,
   `EDITOR_DEVICE_ID` — populated by `bun run auth` + `bun run setup-device`.
 - `COPILOT_CHAT_VERSION`, `VSCODE_VERSION`, `GITHUB_API_VERSION` — sent in
   upstream headers; bump these to track real Copilot Chat releases.
