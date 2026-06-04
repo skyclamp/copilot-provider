@@ -1,4 +1,11 @@
 import { buildResponseHeaders, getProxyContext, isRecord, mapModel } from './proxy.ts';
+import {
+  StructuredOutputAdapterError,
+  chatCompletionToClaudeMessage,
+  chatCompletionToClaudeMessageStream,
+  claudeStructuredOutputToChatCompletions,
+  hasClaudeStructuredOutput,
+} from './messages-structured-output.ts';
 import { pickHeaderExtras, pipeAndExtractUsage } from './usage.ts';
 import type { RequestContext } from './types.ts';
 
@@ -16,6 +23,24 @@ const ANTHROPIC_BETA_PREFIX_WHITELIST = [
 function isAllowedAnthropicBeta(flag: string): boolean {
   return ANTHROPIC_BETA_PREFIX_WHITELIST.some(
     prefix => flag === prefix || flag.startsWith(`${prefix}-`),
+  );
+}
+
+function messageUsageExtras(req: Request): Record<string, string> {
+  const extras = pickHeaderExtras(req.headers, [
+    'x-claude-code-session-id',
+    'x-session-affinity',
+    'x-opencode-session',
+  ]);
+  const ua = req.headers.get('user-agent');
+  if (ua) extras['user-agent'] = ua;
+  return extras;
+}
+
+function invalidStructuredOutputRequest(error: StructuredOutputAdapterError): Response {
+  return new Response(
+    JSON.stringify({ type: 'error', error: { type: 'invalid_request_error', message: error.message } }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } },
   );
 }
 
@@ -102,6 +127,72 @@ export async function proxyMessages(ctx: RequestContext): Promise<Response> {
       `[proxy] ${String(body.model)} stream=${Boolean(body.stream)} effort=${originalEffort} thinking=${thinkingType} key=${apiKeyId}`,
     );
 
+    if (hasClaudeStructuredOutput(body)) {
+      let chatBody: Record<string, unknown>;
+      try {
+        chatBody = claudeStructuredOutputToChatCompletions(body);
+      } catch (error) {
+        if (error instanceof StructuredOutputAdapterError) {
+          return invalidStructuredOutputRequest(error);
+        }
+        throw error;
+      }
+
+      const chatHeaders = { ...headers };
+
+      console.log(
+        `[proxy] structured output via chat/completions model=${String(chatBody.model)} stream=${Boolean(body.stream)} key=${apiKeyId}`,
+      );
+
+      const upstream = await fetch(`${apiBase}/chat/completions`, {
+        method: 'POST',
+        headers: chatHeaders,
+        body: JSON.stringify(chatBody),
+      });
+
+      const respHeaders = buildResponseHeaders(upstream);
+
+      if (!upstream.ok) {
+        const errorBody = await upstream.text();
+        console.error(`[proxy] structured output upstream ${upstream.status}: ${errorBody}`);
+        return new Response(errorBody, { status: upstream.status, headers: respHeaders });
+      }
+
+      const completion = await upstream.json();
+      if (!isRecord(completion)) {
+        throw new Error('structured output upstream returned non-object JSON');
+      }
+      const requestModel = typeof body.model === 'string' ? body.model : null;
+
+      if (Boolean(body.stream)) {
+        respHeaders.set('Content-Type', 'text/event-stream; charset=utf-8');
+        const transformed = new Response(chatCompletionToClaudeMessageStream(completion, requestModel), {
+          status: upstream.status,
+          headers: respHeaders,
+        });
+        return pipeAndExtractUsage(transformed, respHeaders, {
+          endpoint: 'messages',
+          keyId: apiKeyId,
+          stream: true,
+          requestModel,
+          extras: messageUsageExtras(req),
+        });
+      }
+
+      respHeaders.set('Content-Type', 'application/json');
+      const transformed = new Response(JSON.stringify(chatCompletionToClaudeMessage(completion, requestModel)), {
+        status: upstream.status,
+        headers: respHeaders,
+      });
+      return pipeAndExtractUsage(transformed, respHeaders, {
+        endpoint: 'messages',
+        keyId: apiKeyId,
+        stream: false,
+        requestModel,
+        extras: messageUsageExtras(req),
+      });
+    }
+
     const upstream = await fetch(`${apiBase}/v1/messages`, {
       method: 'POST',
       headers,
@@ -117,19 +208,12 @@ export async function proxyMessages(ctx: RequestContext): Promise<Response> {
     }
 
     if (upstream.body) {
-      const extras = pickHeaderExtras(req.headers, [
-        'x-claude-code-session-id',
-        'x-session-affinity',
-        'x-opencode-session',
-      ]);
-      const ua = req.headers.get('user-agent');
-      if (ua) extras['user-agent'] = ua;
       return pipeAndExtractUsage(upstream, respHeaders, {
         endpoint: 'messages',
         keyId: apiKeyId,
         stream: Boolean(body.stream),
         requestModel: typeof body.model === 'string' ? body.model : null,
-        extras,
+        extras: messageUsageExtras(req),
       });
     }
 
