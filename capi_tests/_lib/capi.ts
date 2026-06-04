@@ -92,24 +92,47 @@ function buildCapiHeaders(copilotToken: string): Record<string, string> {
 }
 
 export type CallCapiOptions = {
-  /** JSON body for /v1/messages. */
+  /** JSON body for the target CAPI endpoint. */
   body: object;
   /** Set to true to request SSE (Accept: text/event-stream). */
   stream?: boolean;
-  /** Extra headers (e.g. `anthropic-beta`, `anthropic-version`). Wins over defaults. */
+  /** Extra headers (e.g. `anthropic-beta`, `anthropic-version`). Wins over endpoint defaults. */
   extraHeaders?: Record<string, string>;
 };
+
+type CapiCallResult = { resp: Response; url: string; sentHeaders: Record<string, string> };
 
 /**
  * POST {capiBase}/v1/messages directly. Returns the raw fetch Response so the
  * caller can read it as text/json/stream as needed.
  */
-export async function callCapiMessages(opts: CallCapiOptions): Promise<{ resp: Response; url: string; sentHeaders: Record<string, string> }> {
+export async function callCapiMessages(opts: CallCapiOptions): Promise<CapiCallResult> {
   const tokenResp = await getCopilotToken();
   const apiBase = getCopilotApiBase(tokenResp);
   const url = `${apiBase}/v1/messages`;
   const headers = {
     'anthropic-version': '2023-06-01',
+    ...buildCapiHeaders(tokenResp.token),
+    ...(opts.stream ? { Accept: 'text/event-stream' } : {}),
+    ...(opts.extraHeaders ?? {}),
+  };
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(opts.body),
+  });
+  return { resp, url, sentHeaders: headers };
+}
+
+/**
+ * POST {capiBase}/responses directly. Returns the raw fetch Response so the
+ * caller can read it as text/json/stream as needed.
+ */
+export async function callCapiResponses(opts: CallCapiOptions): Promise<CapiCallResult> {
+  const tokenResp = await getCopilotToken();
+  const apiBase = getCopilotApiBase(tokenResp);
+  const url = `${apiBase}/responses`;
+  const headers = {
     ...buildCapiHeaders(tokenResp.token),
     ...(opts.stream ? { Accept: 'text/event-stream' } : {}),
     ...(opts.extraHeaders ?? {}),

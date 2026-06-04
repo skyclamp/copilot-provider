@@ -3,14 +3,15 @@
 > **Scope.** Every script in this folder is a **probe against Copilot's
 > upstream CAPI**, sent directly with `fetch`. These scripts are completely
 > independent of the proxy in `src/`: they do their own GitHub-token →
-> Copilot-token exchange in `_lib/capi.ts` and POST straight to
-> `<copilot-api>/v1/messages`. The local proxy server does **not** need to be
+> Copilot-token exchange in `_lib/capi.ts` and POST straight to the relevant
+> upstream endpoint (`<copilot-api>/v1/messages`, `<copilot-api>/responses`,
+> …). The local proxy server does **not** need to be
 > running for any of these probes, and proxy behaviour (model aliasing, beta
 > header whitelist, structured-output rewriting, …) does not affect them.
 >
 > The goal of each probe is to learn how CAPI itself behaves for a given
-> Anthropic-style feature (server tools, structured output, reasoning effort,
-> …) on a given Copilot-served model.
+> model-family feature (server tools, structured output, reasoning effort, …)
+> on a given Copilot-served model.
 
 Scripts are runnable directly with `bun run`. They are **not** `bun test`
 unit tests — there is no assertion framework, just one-shot CAPI calls with
@@ -23,17 +24,21 @@ Grouped by model family, then by feature category:
 ```
 capi_tests/
   _lib/
-    capi.ts                  # token exchange + raw CAPI /v1/messages client
+    capi.ts                  # token exchange + raw CAPI endpoint clients
   claude/
     server-tools/
       web-search.ts          # Anthropic web_search server tool probe
       web-fetch.ts           # Anthropic web_fetch server tool probe
       support-matrix.ts      # batch probe across several Anthropic tool types
       RESULTS.md             # recorded findings from the matrix probe
+  openai/
+    server-tools/
+      support-matrix.ts      # batch probe across OpenAI Responses built-in tools
+      RESULTS.md             # recorded findings from the OpenAI matrix probe
 ```
 
 Future siblings: other Claude features (structured output, vision, …) and
-other families (`gpt/`, `gemini/`, …).
+other families (`gemini/`, …).
 
 ## Prerequisites
 
@@ -65,22 +70,25 @@ bun run capi_tests/claude/server-tools/web-fetch.ts --stream
 bun run capi_tests/claude/server-tools/support-matrix.ts
 bun run capi_tests/claude/server-tools/support-matrix.ts --tool code_execution_20260120
 bun run capi_tests/claude/server-tools/support-matrix.ts --verbose
+
+bun run capi_tests/openai/server-tools/support-matrix.ts
+bun run capi_tests/openai/server-tools/support-matrix.ts --model gpt-5.4
+bun run capi_tests/openai/server-tools/support-matrix.ts --tool web_search
+bun run capi_tests/openai/server-tools/support-matrix.ts --verbose
 ```
 
 Each probe prints, in order, the resolved CAPI URL, the model + tool +
-streaming mode, the upstream HTTP status + elapsed time, and a summary of
-every Anthropic content block (text, `server_tool_use`,
-`web_search_tool_result`, `web_fetch_tool_result`, errors, …) plus
-`stop_reason` / `usage`. The matrix probe additionally renders a verdict
-table at the end.
+streaming mode when applicable, the upstream HTTP status + elapsed time, and a
+summary of the feature-specific response shape. Matrix probes additionally
+render a verdict table at the end.
 
 ## Adding a new probe
 
 1. Create a `.ts` file under the right family/category folder.
-2. Import `callCapiMessages` from `capi_tests/_lib/capi.ts` and build the
-   request body following the Anthropic docs (whose mirrors live in
-   `docs/claude/`).
-3. Send the appropriate `anthropic-beta` header via the `extraHeaders` option
-   when the feature requires it — there is no whitelist to fight.
+2. Import the matching raw client from `capi_tests/_lib/capi.ts`
+   (`callCapiMessages`, `callCapiResponses`, …) and build the request body
+   following that model family's upstream API docs.
+3. Send the appropriate extra headers via the `extraHeaders` option when the
+   feature requires them — there is no proxy whitelist to fight.
 4. Parse the upstream response and print enough detail that re-running the
    probe makes upstream behaviour changes obvious in the diff.
