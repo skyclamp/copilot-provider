@@ -78,38 +78,30 @@ matching handler.
 ### Proxy contract (do not break)
 
 - **Pass-through by default.** Don't validate or rewrite the request body
-  beyond what's already done (model alias mapping, effort coercion,
-  `anthropic-beta` cleanup).
+  beyond what's already done (model alias mapping, `anthropic-beta` cleanup,
+  structured-output rewrite).
 - **Errors are pass-through too.** Forward upstream status + body verbatim;
   only synthesise a `502` when the proxy itself fails.
 - **Streaming uses `pipeAndExtractUsage()`** — it tees the upstream
   `ReadableStream` (one branch becomes the `Response` body, the other is
   consumed in the background to extract usage into
   `usage/<key-id>-YYYY-MM.jsonl`). Don't buffer entire upstream responses.
-- **Only mutate request fields the caller provided.** Specifically: never
-  synthesise `output_config` if absent — only adjust `output_config.effort`
-  when the caller already supplied one. See the write-back block in
-  [src/messages.ts](src/messages.ts).
+- **Only mutate request fields the caller provided.** Never synthesise
+  `output_config` if absent.
 
 ### Model + effort routing (`src/messages.ts`)
 
-Pattern: snapshot `originalModel` / `originalEffort`, decide the resolved
-`model` / `effort` purely on locals, then write back in one place.
-
 - `MODEL_ALIASES` in [src/constants.ts](src/constants.ts) is a **plain static
-  map** — no env-reading getters. Sub-model logic does not belong there.
-- Env-driven 1M routing lives in `messages.ts`:
-  - `ROUTE_OPUS_4_6_TO_1M=true` → routes `claude-opus-4.6` to `claude-opus-4.6-1m`
-  - `ROUTE_OPUS_4_7_TO_1M=true` → routes `claude-opus-4.7` to `claude-opus-4.7-1m-internal`
-- `claude-opus-4.7` fans out into three sub-models keyed by effort
-  (`medium` → base, `high` → `-high`, `xhigh` → `-xhigh`); `low`/`medium`
-  collapse to `medium`, `max` becomes `xhigh`.
-- `claude-opus-4.7-1m-internal` caps effort at `xhigh`.
-- `claude-opus-4.6{,-1m}` and `claude-sonnet-4.6` cap effort at `high`
-  (i.e. `max` → `high`).
-
-When adding new model rules, follow the same structure: snapshot → mutate
-locals → single write-back guarded by `xxx !== originalXxx`.
+  map** — no env-reading getters. It resolves friendly aliases to canonical
+  model ids: `opus` / `opus[1m]` → `claude-opus-4.8`, `sonnet` / `sonnet[1m]`
+  → `claude-sonnet-4.6`, `haiku` → `claude-haiku-4.5`.
+- No sub-model fan-out or effort coercion: `claude-opus-4.6`,
+  `claude-opus-4.7`, `claude-opus-4.8` and `claude-sonnet-4.6` all support 1M
+  context and the full `low`…`max` thinking range natively, so the request
+  `model` + `output_config.effort` are forwarded unchanged.
+- Structured output (`output_config.format`) is rewritten onto
+  `/chat/completions` (see `messages-structured-output.ts`) because
+  `claude-opus-4.7` does not support it natively on `/v1/messages`.
 
 ### Auth
 
@@ -135,8 +127,7 @@ See [.env.example](.env.example). Required for normal operation:
   upstream headers; bump these to track real Copilot Chat releases.
 - `PORT` (default `4141`).
 
-Optional toggles: `DISABLE_INPUT_AUTH`, `GHE_HOST`, `ROUTE_OPUS_4_6_TO_1M`,
-`ROUTE_OPUS_4_7_TO_1M`.
+Optional toggles: `DISABLE_INPUT_AUTH`, `GHE_HOST`.
 
 Optional, only consumed by `src/web-search.ts`:
 

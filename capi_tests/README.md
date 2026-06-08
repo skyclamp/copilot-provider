@@ -31,13 +31,19 @@ capi_tests/
       web-fetch.ts           # Anthropic web_fetch server tool probe
       support-matrix.ts      # batch probe across several Anthropic tool types
       RESULTS.md             # recorded findings from the matrix probe
+    structured-output/
+      json-schema.ts           # native /v1/messages output_config.format probe
+      RESULTS.md               # recorded findings for structured outputs
+    beta-headers/
+      support-matrix.ts        # anthropic-beta header acceptance, model × header grid
+      RESULTS.md               # recorded findings for beta-header support
   openai/
     server-tools/
       support-matrix.ts      # batch probe across OpenAI Responses built-in tools
       RESULTS.md             # recorded findings from the OpenAI matrix probe
 ```
 
-Future siblings: other Claude features (structured output, vision, …) and
+Future siblings: other Claude features (vision, …) and
 other families (`gemini/`, …).
 
 ## Prerequisites
@@ -75,6 +81,15 @@ bun run capi_tests/openai/server-tools/support-matrix.ts
 bun run capi_tests/openai/server-tools/support-matrix.ts --model gpt-5.4
 bun run capi_tests/openai/server-tools/support-matrix.ts --tool web_search
 bun run capi_tests/openai/server-tools/support-matrix.ts --verbose
+
+bun run capi_tests/claude/structured-output/json-schema.ts             # non-streaming
+bun run capi_tests/claude/structured-output/json-schema.ts --stream    # SSE streaming
+bun run capi_tests/claude/structured-output/json-schema.ts --model claude-opus-4.7
+
+bun run capi_tests/claude/beta-headers/support-matrix.ts                       # full model × header grid
+bun run capi_tests/claude/beta-headers/support-matrix.ts --model claude-opus-4.8
+bun run capi_tests/claude/beta-headers/support-matrix.ts --beta files-api-2025-04-14
+bun run capi_tests/claude/beta-headers/support-matrix.ts --verbose
 ```
 
 Each probe prints, in order, the resolved CAPI URL, the model + tool +

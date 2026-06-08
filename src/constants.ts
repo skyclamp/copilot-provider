@@ -39,7 +39,9 @@ export const MODEL_ALIASES: Record<string, string> = {
   'claude-opus-4-6': 'claude-opus-4.6',
   'claude-opus-4-7': 'claude-opus-4.7',
   'claude-opus-4-8': 'claude-opus-4.8',
-  haiku: 'claude-haiku-4.5',
-  sonnet: 'claude-sonnet-4.6',
-  opus: 'claude-opus-4.7',
+  'haiku': 'claude-haiku-4.5',
+  'sonnet': 'claude-sonnet-4.6',
+  'sonnet[1m]': 'claude-sonnet-4.6',
+  'opus': 'claude-opus-4.8',
+  'opus[1m]': 'claude-opus-4.8',
 };

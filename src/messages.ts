@@ -9,21 +9,38 @@ import {
 import { pickHeaderExtras, pipeAndExtractUsage } from './usage.ts';
 import type { RequestContext } from './types.ts';
 
-const EFFORT_RANK: Record<string, number> = { low: 0, medium: 1, high: 2, xhigh: 3, max: 4 };
-
-// Prefixes of `anthropic-beta` flags the upstream Copilot endpoint accepts.
-// Sourced from the vscode codebase at
-// `src/vs/platform/agentHost/node/claude/anthropicBetas.ts`.
-const ANTHROPIC_BETA_PREFIX_WHITELIST = [
-  'interleaved-thinking',
-  'context-management',
-  'advanced-tool-use',
-];
+// Exact `anthropic-beta` flags the proxy forwards upstream. Derived from the
+// CAPI beta-header probe (`capi_tests/claude/beta-headers/`), which records
+// which headers Copilot's `/v1/messages` admits vs. rejects with
+// "unsupported beta header(s)". Anything not listed here is silently stripped,
+// so an unprobed/rejected header can never reach CAPI and trigger a 400.
+//
+// Tool/input betas are only included when the matching server-tools probe
+// (`capi_tests/claude/server-tools/`) confirms the underlying tool actually
+// works on Copilot CAPI. Re-run both probes and reconcile this list when
+// Copilot's gateway changes.
+const ANTHROPIC_BETA_WHITELIST = new Set<string>([
+  // Generation / thinking / context
+  'interleaved-thinking-2025-05-14',
+  'dev-full-thinking-2025-05-14',
+  'thinking-token-count-2026-05-13',
+  'context-management-2025-06-27', // also gates the `memory` tool (probe: supported)
+  'context-1m-2025-08-07',
+  'model-context-window-exceeded-2025-08-26',
+  'advanced-tool-use-2025-11-20',
+  'fast-mode-2026-02-01',
+  'output-300k-2026-03-24',
+  // Caching
+  'prompt-caching-2024-07-31',
+  'extended-cache-ttl-2025-04-11',
+  'cache-diagnosis-2026-04-07',
+  // Tools / input — only betas the server-tools probe confirms work on CAPI
+  'computer-use-2025-11-24', // bash / computer / text_editor tools (probe: supported)
+  'fine-grained-tool-streaming-2025-05-14', // tool-input streaming toggle
+]);
 
 function isAllowedAnthropicBeta(flag: string): boolean {
-  return ANTHROPIC_BETA_PREFIX_WHITELIST.some(
-    prefix => flag === prefix || flag.startsWith(`${prefix}-`),
-  );
+  return ANTHROPIC_BETA_WHITELIST.has(flag);
 }
 
 function messageUsageExtras(req: Request): Record<string, string> {
@@ -65,66 +82,11 @@ export async function proxyMessages(ctx: RequestContext): Promise<Response> {
 
     const outputConfig = isRecord(body.output_config) ? body.output_config : null;
     const thinking = isRecord(body.thinking) ? body.thinking : null;
-    const originalModel = typeof body.model === 'string' ? body.model : null;
-    const originalEffort = typeof outputConfig?.effort === 'string' ? (outputConfig.effort as string) : null;
-
-    let model = originalModel;
-    let effort = originalEffort;
-
-    if (model === 'claude-opus-4.6' && Bun.env.ROUTE_OPUS_4_6_TO_1M === 'true') {
-      model = 'claude-opus-4.6-1m';
-    } else if (model === 'claude-opus-4.7' && Bun.env.ROUTE_OPUS_4_7_TO_1M === 'true') {
-      model = 'claude-opus-4.7-1m-internal';
-    }
-
-    if (model === 'claude-opus-4.7') {
-      if (effort === null) {
-        model = 'claude-opus-4.7-high';
-      } else {
-        if (EFFORT_RANK[effort] <= EFFORT_RANK.medium) {
-          effort = 'medium';
-        } else if (effort === 'max') {
-          effort = 'xhigh';
-        }
-        if (effort === 'high') {
-          model = 'claude-opus-4.7-high';
-        } else if (effort === 'xhigh') {
-          model = 'claude-opus-4.7-xhigh';
-        }
-      }
-    } else if (
-      model === 'claude-opus-4.7-1m-internal' &&
-      effort !== null &&
-      EFFORT_RANK[effort] > EFFORT_RANK.xhigh
-    ) {
-      effort = 'xhigh';
-    }
-
-    if (
-      effort === 'max' &&
-      (model === 'claude-opus-4.6' || model === 'claude-opus-4.6-1m' || model === 'claude-sonnet-4.6')
-    ) {
-      effort = 'high';
-    }
-
-    if (
-      model === 'claude-opus-4.8' &&
-      effort !== null &&
-      EFFORT_RANK[effort] > EFFORT_RANK.medium
-    ) {
-      effort = 'medium';
-    }
-
-    if (model !== originalModel) {
-      body.model = model;
-    }
-    if (effort !== originalEffort && outputConfig !== null) {
-      outputConfig.effort = effort;
-    }
+    const effort = typeof outputConfig?.effort === 'string' ? (outputConfig.effort as string) : null;
 
     const thinkingType = typeof thinking?.type === 'string' ? (thinking.type as string) : 'none';
     console.log(
-      `[proxy] ${String(body.model)} stream=${Boolean(body.stream)} effort=${originalEffort} thinking=${thinkingType} key=${apiKeyId}`,
+      `[proxy] ${String(body.model)} stream=${Boolean(body.stream)} effort=${effort} thinking=${thinkingType} key=${apiKeyId}`,
     );
 
     if (hasClaudeStructuredOutput(body)) {
