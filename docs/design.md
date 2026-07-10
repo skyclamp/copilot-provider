@@ -14,8 +14,11 @@
 | `POST /v1/responses` | `{api}/responses` |
 | `POST /v1/chat/completions` | `{api}/chat/completions` |
 | `POST /v1/embeddings` | `{api}/embeddings` |
+| `GET /v1/models` | `{api}/models`，转换为 Codex 模型目录并缓存 4 小时 |
 
 `/v1/responses`、`/v1/chat/completions` 和 `/v1/embeddings` 的上游路径无 `/v1` 前缀。
+
+Codex 模型目录只返回代码中按性能降序维护的白名单模型；CAPI 新增模型不会自动公开。
 
 其他所有请求 → 404。
 

@@ -1,6 +1,7 @@
 import { proxyChatCompletions } from './chat-completions.ts';
 import { proxyEmbeddings } from './embeddings.ts';
 import { proxyMessages } from './messages.ts';
+import { listCodexModels } from './models.ts';
 import { proxyResponses } from './responses.ts';
 import { resolveKeyId } from './usage.ts';
 import type { EndpointHandler, RequestContext } from './types.ts';
@@ -61,6 +62,14 @@ async function dispatch(req: Request): Promise<Response> {
 
   if (method === 'HEAD' && path === '/') {
     return new Response(null, { status: 200 });
+  }
+
+  if (method === 'GET' && path === '/v1/models') {
+    const apiKeyId = getApiKeyId(req, 'bearer');
+    if (!apiKeyId) {
+      return rejectUnauthorized(method, path, 'authorization');
+    }
+    return listCodexModels(req);
   }
 
   if (method === 'POST') {

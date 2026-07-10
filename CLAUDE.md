@@ -47,6 +47,7 @@ exposes:
 - `POST /v1/responses` → upstream `{api}/responses` ([src/responses.ts](src/responses.ts))
 - `POST /v1/chat/completions` → upstream `{api}/chat/completions` ([src/chat-completions.ts](src/chat-completions.ts))
 - `POST /v1/embeddings` → upstream `{api}/embeddings` ([src/embeddings.ts](src/embeddings.ts))
+- `GET /v1/models` → Codex-compatible model catalog sourced from upstream `{api}/models` ([src/models.ts](src/models.ts))
 
 Anything else returns `404 null`. See [docs/design.md](docs/design.md) for
 the upstream-path contract — note that `/v1/responses`,
@@ -65,6 +66,7 @@ forwarding.
 | `responses.ts` | `/v1/responses` proxy |
 | `chat-completions.ts` | `/v1/chat/completions` proxy |
 | `embeddings.ts` | `/v1/embeddings` proxy |
+| `models.ts` | Codex-compatible `/models` mapping with a four-hour CAPI cache and an explicitly ordered model allowlist |
 | `usage.ts` | API-key resolution, SSE usage parser, `pipeAndExtractUsage()` |
 | `types.ts` | Shared types (`RequestContext`, `ProxyContext`, …) |
 | `web-fetch.ts` | Standalone `webFetch()` library: URL → markdown (linkedom + Readability + Turndown) or raw HTML, with pagination. Not wired to any HTTP endpoint. |
@@ -127,7 +129,7 @@ See [.env.example](.env.example). Required for normal operation:
   upstream headers; bump these to track real Copilot Chat releases.
 - `PORT` (default `4141`).
 
-Optional toggles: `DISABLE_INPUT_AUTH`, `GHE_HOST`.
+Optional settings: `DISABLE_INPUT_AUTH`, `GHE_HOST`, `MODELS_API_VERSION`.
 
 Optional, only consumed by `src/web-search.ts`:
 

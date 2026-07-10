@@ -2,9 +2,9 @@
 /**
  * Standalone Copilot models fetcher.
  *
- * Takes a GitHub access token, exchanges it for a Copilot token (prints the
- * exchange response as JSON), then calls /models and prints that response as
- * JSON. Supports github.com (default) and GitHub Enterprise (--ghe-host).
+ * Takes a GitHub access token, exchanges it for a Copilot token, then calls
+ * /models and prints that response as JSON. The exchange response can also be
+ * printed for debugging with --include-token-response.
  *
  * Usage:
  *   bun run scripts/fetch-models.ts --token <github-token> [OPTIONS]
@@ -25,6 +25,7 @@ type Args = {
   token: string | null;
   gheHost: string | null;
   copilotApiBaseUrl: string | null;
+  includeTokenResponse: boolean;
   help: boolean;
 };
 
@@ -35,6 +36,7 @@ function parseArgs(argv: string[]): Args {
       ? Bun.env.GHE_HOST.replace(/^https?:\/\//, '').replace(/\/+$/, '')
       : null,
     copilotApiBaseUrl: null,
+    includeTokenResponse: false,
     help: false,
   };
 
@@ -48,6 +50,8 @@ function parseArgs(argv: string[]): Args {
       args.gheHost = argv[++i].replace(/^https?:\/\//, '').replace(/\/+$/, '');
     } else if (a === '--copilot-api-base-url' && i + 1 < argv.length) {
       args.copilotApiBaseUrl = argv[++i].replace(/\/+$/, '');
+    } else if (a === '--include-token-response') {
+      args.includeTokenResponse = true;
     } else {
       throw new Error(`Unknown argument: ${a}`);
     }
@@ -60,8 +64,8 @@ function printHelp(): void {
   console.log([
     'Usage: bun run scripts/fetch-models.ts --token <github-token> [OPTIONS]',
     '',
-    'Exchanges a GitHub access token for a Copilot token, prints that response',
-    'as JSON, then calls the Copilot /models endpoint and prints that as JSON.',
+    'Exchanges a GitHub access token for a Copilot token, then calls the',
+    'Copilot /models endpoint and prints its response as JSON.',
     '',
     'Options:',
     '  --token <token>             GitHub access token (or set GITHUB_TOKEN env).',
@@ -70,6 +74,7 @@ function printHelp(): void {
     '                              Omit for github.com.',
     '  --copilot-api-base-url <url>',
     '                              Override the Copilot API base URL.',
+    '  --include-token-response    Print the token exchange response before /models.',
     '  -h, --help                  Show this help.',
   ].join('\n'));
 }
@@ -185,7 +190,9 @@ const copilotTokenResponse = await exchangeForCopilotToken({
   githubToken: args.token,
 });
 
-console.log(JSON.stringify(copilotTokenResponse, null, 2));
+if (args.includeTokenResponse) {
+  console.log(JSON.stringify(copilotTokenResponse, null, 2));
+}
 
 const copilotApiBaseUrl =
   args.copilotApiBaseUrl ||
