@@ -81,11 +81,9 @@ describe('Codex models catalog', () => {
 
   test('only returns whitelisted models in descending performance order', () => {
     const ids = [
-      'mai-code-1-flash-picker',
       'future-model',
-      'gpt-5-mini',
-      'gpt-5.4-mini',
       'gpt-5.3-codex',
+      'gpt-5.4-mini',
       'gpt-5.4',
       'gpt-5.5',
       'gpt-5.6-luna',
@@ -98,16 +96,14 @@ describe('Codex models catalog', () => {
 
     expect(result.models.map(model => model.slug)).toEqual([
       'gpt-5.6-sol',
-      'gpt-5.5',
       'gpt-5.6-terra',
-      'gpt-5.4',
-      'gpt-5.3-codex',
       'gpt-5.6-luna',
+      'gpt-5.5',
+      'gpt-5.4',
       'gpt-5.4-mini',
-      'gpt-5-mini',
-      'mai-code-1-flash-picker',
+      'gpt-5.3-codex',
     ]);
-    expect(result.models.map(model => model.priority)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(result.models.map(model => model.priority)).toEqual([1, 2, 3, 4, 5, 6, 7]);
   });
 
   test('caches a successful catalog for four hours and coalesces refreshes', async () => {

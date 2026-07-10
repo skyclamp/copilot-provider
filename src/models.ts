@@ -8,14 +8,12 @@ const CODEX_BASE_INSTRUCTIONS =
   'You are Codex, a coding agent. Work with the user in the current workspace to complete software engineering tasks. Follow the instructions provided by the client, use tools when helpful, make precise changes, and continue until the task is complete.';
 const MODEL_WHITELIST = [
   'gpt-5.6-sol',
-  'gpt-5.5',
   'gpt-5.6-terra',
-  'gpt-5.4',
-  'gpt-5.3-codex',
   'gpt-5.6-luna',
+  'gpt-5.5',
+  'gpt-5.4',
   'gpt-5.4-mini',
-  'gpt-5-mini',
-  'mai-code-1-flash-picker',
+  'gpt-5.3-codex',
 ] as const;
 
 type CodexReasoningEffortPreset = {
