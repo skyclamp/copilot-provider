@@ -106,6 +106,87 @@ describe('Codex models catalog', () => {
     expect(result.models.map(model => model.priority)).toEqual([1, 2, 3, 4, 5, 6, 7]);
   });
 
+  test('layers CAPI capabilities over official Codex model templates', () => {
+    const ids = [
+      'gpt-5.6-sol',
+      'gpt-5.6-terra',
+      'gpt-5.6-luna',
+      'gpt-5.5',
+      'gpt-5.4',
+      'gpt-5.4-mini',
+      'gpt-5.3-codex',
+    ];
+    const result = toCodexModelsResponse({
+      data: ids.map(id => ({ ...eligibleModel, id, name: id })),
+    });
+    const bySlug = new Map(result.models.map(model => [model.slug, model]));
+    const sol = bySlug.get('gpt-5.6-sol')!;
+    const terra = bySlug.get('gpt-5.6-terra')!;
+    const luna = bySlug.get('gpt-5.6-luna')!;
+    const gpt55 = bySlug.get('gpt-5.5')!;
+    const gpt54 = bySlug.get('gpt-5.4')!;
+    const gpt54Mini = bySlug.get('gpt-5.4-mini')!;
+    const gpt53Codex = bySlug.get('gpt-5.3-codex')!;
+
+    expect(sol.base_instructions).toBe(terra.base_instructions);
+    expect(luna.base_instructions).toBe(terra.base_instructions);
+    expect(sol.tool_mode).toBe('code_mode_only');
+    expect(sol.multi_agent_version).toBe('v2');
+    expect(luna.multi_agent_version).toBe('v1');
+    expect(gpt55.include_skills_usage_instructions).toBe(true);
+    expect(gpt54.base_instructions).toBe(gpt54Mini.base_instructions);
+    expect(gpt54.default_verbosity).toBe('medium');
+
+    expect(gpt53Codex.base_instructions).toContain('# Autonomy and persistence');
+    expect(gpt53Codex.base_instructions).toContain('Preserve assistant message phase metadata');
+    expect(gpt53Codex.base_instructions).not.toBe(gpt54Mini.base_instructions);
+    expect(gpt53Codex.include_skills_usage_instructions).toBe(true);
+    expect(gpt53Codex.model_messages).toMatchObject({
+      instructions_template: expect.stringContaining('{{ personality }}'),
+    });
+
+    for (const model of result.models) {
+      expect(model.context_window).toBe(922_000);
+      expect(model.max_context_window).toBe(1_050_000);
+      expect(model.supported_reasoning_levels.map(item => item.effort)).toEqual([
+        'none',
+        'low',
+        'medium',
+        'high',
+        'xhigh',
+        'max',
+      ]);
+      expect(model.supports_parallel_tool_calls).toBe(true);
+      expect(model.input_modalities).toEqual(['text', 'image']);
+    }
+  });
+
+  test('preserves official template capabilities when CAPI omits them', () => {
+    const result = toCodexModelsResponse({
+      data: [{
+        id: 'gpt-5.6-sol',
+        name: 'GPT-5.6 Sol',
+        model_picker_enabled: true,
+        supported_endpoints: ['/responses'],
+        capabilities: {},
+      }],
+    });
+    const model = result.models[0];
+
+    expect(model.context_window).toBe(372_000);
+    expect(model.max_context_window).toBe(372_000);
+    expect(model.supports_parallel_tool_calls).toBe(true);
+    expect(model.input_modalities).toEqual(['text', 'image']);
+    expect(model.supported_reasoning_levels.map(item => item.effort)).toEqual([
+      'low',
+      'medium',
+      'high',
+      'xhigh',
+      'max',
+      'ultra',
+    ]);
+  });
+
   test('caches a successful catalog for four hours and coalesces refreshes', async () => {
     let now = 1_000;
     let calls = 0;

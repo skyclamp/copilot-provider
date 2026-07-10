@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// Package the runnable source (src/, index.ts, package.json, tsconfig.json)
+// Package the runnable source and the official Codex model template catalog
 // into a zip for distribution. src/keys.json is included.
 //
 // Usage:
@@ -13,8 +13,20 @@ const MODULE_DIR = dirname(new URL(import.meta.url).pathname);
 const ROOT = resolve(MODULE_DIR, '..');
 const DEFAULT_OUT = resolve(ROOT, 'dist', 'src.zip');
 
-const ENTRIES = ['src', 'index.ts', 'package.json', 'tsconfig.json'] as const;
-const REQUIRED_FILES = ['src/keys.json', 'index.ts', 'package.json', 'tsconfig.json'] as const;
+const ENTRIES = [
+  'src',
+  'index.ts',
+  'package.json',
+  'tsconfig.json',
+  'codex-models.json',
+] as const;
+const REQUIRED_FILES = [
+  'src/keys.json',
+  'index.ts',
+  'package.json',
+  'tsconfig.json',
+  'codex-models.json',
+] as const;
 
 type Args = { out: string };
 
