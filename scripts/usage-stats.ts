@@ -144,6 +144,7 @@ type ClaudePricing = { input: number; output: number; cache5m: number; cache1h: 
 const CLAUDE_PRICING: Record<string, ClaudePricing> = {
   'claude-haiku-4.5': { input: 1.0, output: 5.0, cache5m: 1.25, cache1h: 2.0, cacheRead: 0.10 },
   'claude-sonnet-4.6': { input: 3.0, output: 15.0, cache5m: 3.75, cache1h: 6.0, cacheRead: 0.30 },
+  'claude-sonnet-5': { input: 3.0, output: 15.0, cache5m: 3.75, cache1h: 6.0, cacheRead: 0.30 },
   'claude-opus-4.6': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
   'claude-opus-4.6-1m': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
   'claude-opus-4.7': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
@@ -151,6 +152,7 @@ const CLAUDE_PRICING: Record<string, ClaudePricing> = {
   'claude-opus-4.7-xhigh': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
   'claude-opus-4.7-1m-internal': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
   'claude-opus-4.8': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
+  'claude-opus-5': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
 };
 
 function computeEntryCost(entry: Entry): number {
@@ -173,6 +175,9 @@ function computeEntryCost(entry: Entry): number {
 
 type OpenAIPricing = { input: number; cachedInput: number; output: number };
 const OPENAI_PRICING: Record<string, OpenAIPricing> = {
+  'gpt-5.6-sol': { input: 5.00, cachedInput: 0.50, output: 30.00 },
+  'gpt-5.6-terra': { input: 2.50, cachedInput: 0.25, output: 15.00 },
+  'gpt-5.6-luna': { input: 1.00, cachedInput: 0.10, output: 6.00 },
   'gpt-5.5': { input: 5.00, cachedInput: 0.50, output: 30.00 },
   'gpt-5.4': { input: 2.50, cachedInput: 0.25, output: 15.00 },
   'gpt-5.3-codex': { input: 1.75, cachedInput: 0.175, output: 14.00 },
