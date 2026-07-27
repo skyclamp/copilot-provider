@@ -1,4 +1,5 @@
 import { proxyChatCompletions } from './chat-completions.ts';
+import { isClaudeCodeRequest, listClaudeCodeModels } from './claude-models.ts';
 import { proxyEmbeddings } from './embeddings.ts';
 import { proxyMessages } from './messages.ts';
 import { listCodexModels } from './models.ts';
@@ -65,9 +66,13 @@ async function dispatch(req: Request): Promise<Response> {
   }
 
   if (method === 'GET' && path === '/v1/models') {
-    const apiKeyId = getApiKeyId(req, 'bearer');
+    // Claude Code model discovery sends the credential in `x-api-key` only.
+    const apiKeyId = getApiKeyId(req, 'bearer') || getApiKeyId(req, 'x-api-key');
     if (!apiKeyId) {
       return rejectUnauthorized(method, path, 'authorization');
+    }
+    if (isClaudeCodeRequest(req)) {
+      return listClaudeCodeModels(req);
     }
     return listCodexModels(req);
   }
