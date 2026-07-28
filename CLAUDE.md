@@ -127,7 +127,8 @@ See [.env.example](.env.example). Required for normal operation:
   upstream headers; bump these to track real Copilot Chat releases.
 - `PORT` (default `4141`).
 
-Optional settings: `DISABLE_INPUT_AUTH`, `GHE_HOST`, `MODELS_API_VERSION`.
+Optional settings: `DISABLE_INPUT_AUTH`, `DISABLE_USAGE_LOGGING`, `GHE_HOST`.
+`MODELS_API_VERSION` is only read by the `bun run fetch-models` debug script.
 
 Optional, only consumed by `src/web-search.ts`:
 
