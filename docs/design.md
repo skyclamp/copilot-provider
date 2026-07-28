@@ -14,15 +14,8 @@
 | `POST /v1/responses` | `{api}/responses` |
 | `POST /v1/chat/completions` | `{api}/chat/completions` |
 | `POST /v1/embeddings` | `{api}/embeddings` |
-| `GET /v1/models` | Claude Code（按请求头识别）→ 本地 `models.json` 中的 Claude 模型目录；其他客户端 → `{api}/models`，转换为 Codex 模型目录并缓存 4 小时 |
 
 `/v1/responses`、`/v1/chat/completions` 和 `/v1/embeddings` 的上游路径无 `/v1` 前缀。
-
-Codex 模型目录只返回代码中按性能降序维护的白名单模型；CAPI 新增模型不会自动公开。
-
-Claude Code 的模型发现（`GET /v1/models?limit=1000`，凭据在 `x-api-key`）返回
-Anthropic `data[{type,id,display_name}]` 结构，仅包含 `models.json` 中
-`model_picker_enabled` 且支持 `/v1/messages` 的 Claude 系列模型。
 
 其他所有请求 → 404。
 
