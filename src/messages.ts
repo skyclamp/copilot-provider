@@ -1,17 +1,6 @@
 import { buildResponseHeaders, getProxyContext, isRecord, mapModel } from './proxy.ts';
-import { pickHeaderExtras, pipeAndExtractUsage } from './usage.ts';
+import { pipeAndExtractUsage, requestUsageExtras } from './usage.ts';
 import type { RequestContext } from './types.ts';
-
-function messageUsageExtras(req: Request): Record<string, string> {
-  const extras = pickHeaderExtras(req.headers, [
-    'x-claude-code-session-id',
-    'x-session-affinity',
-    'x-opencode-session',
-  ]);
-  const ua = req.headers.get('user-agent');
-  if (ua) extras['user-agent'] = ua;
-  return extras;
-}
 
 export async function proxyMessages(ctx: RequestContext): Promise<Response> {
   try {
@@ -60,7 +49,7 @@ export async function proxyMessages(ctx: RequestContext): Promise<Response> {
         keyId: apiKeyId,
         stream: Boolean(body.stream),
         requestModel: typeof body.model === 'string' ? body.model : null,
-        extras: messageUsageExtras(req),
+        extras: requestUsageExtras(req),
       });
     }
 

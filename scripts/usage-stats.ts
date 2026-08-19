@@ -116,6 +116,9 @@ const OPENAI_BILLING_USAGE_FIELDS = new Set([
   'input_tokens',
   'input_tokens_details.cached_tokens',
   'output_tokens',
+  'prompt_tokens',
+  'prompt_tokens_details.cached_tokens',
+  'completion_tokens',
 ]);
 
 function formatNumber(n: unknown): string {
@@ -141,62 +144,170 @@ function claudeFamily(model: string | null | undefined): string | null {
 }
 
 type ClaudePricing = { input: number; output: number; cache5m: number; cache1h: number; cacheRead: number };
+// Standard Claude API rates per 1M tokens:
+// https://platform.claude.com/docs/en/about-claude/pricing
 const CLAUDE_PRICING: Record<string, ClaudePricing> = {
   'claude-haiku-4.5': { input: 1.0, output: 5.0, cache5m: 1.25, cache1h: 2.0, cacheRead: 0.10 },
+  'claude-sonnet-4.5': { input: 3.0, output: 15.0, cache5m: 3.75, cache1h: 6.0, cacheRead: 0.30 },
   'claude-sonnet-4.6': { input: 3.0, output: 15.0, cache5m: 3.75, cache1h: 6.0, cacheRead: 0.30 },
-  'claude-sonnet-5': { input: 3.0, output: 15.0, cache5m: 3.75, cache1h: 6.0, cacheRead: 0.30 },
+  'claude-sonnet-5': { input: 2.0, output: 10.0, cache5m: 2.50, cache1h: 4.0, cacheRead: 0.20 },
+  'claude-opus-4.5': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
   'claude-opus-4.6': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
-  'claude-opus-4.6-1m': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
   'claude-opus-4.7': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
-  'claude-opus-4.7-high': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
-  'claude-opus-4.7-xhigh': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
-  'claude-opus-4.7-1m-internal': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
   'claude-opus-4.8': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
   'claude-opus-5': { input: 5.0, output: 25.0, cache5m: 6.25, cache1h: 10.0, cacheRead: 0.50 },
 };
 
-function computeEntryCost(entry: Entry): number {
-  const pricing = entry.model ? CLAUDE_PRICING[entry.model] : undefined;
+function claudePricing(model: string | null | undefined): ClaudePricing | undefined {
+  if (!model) return undefined;
+  const normalized = model.replace(
+    /^claude-(opus|sonnet|haiku)-(\d+)-(\d+)/,
+    'claude-$1-$2.$3',
+  );
+  return Object.entries(CLAUDE_PRICING)
+    .sort(([a], [b]) => b.length - a.length)
+    .find(([prefix]) => normalized === prefix || normalized.startsWith(`${prefix}-`))?.[1];
+}
+
+export function computeClaudeEntryCost(entry: Entry): number {
+  const pricing = claudePricing(entry.model);
   if (!pricing) return 0;
   const u = entry.usage || {};
   const inputTokens = u.input_tokens || 0;
   const outputTokens = u.output_tokens || 0;
   const cache5m = u.cache_creation?.ephemeral_5m_input_tokens || 0;
   const cache1h = u.cache_creation?.ephemeral_1h_input_tokens || 0;
+  const unclassifiedCacheWrite = Math.max(
+    0,
+    (u.cache_creation_input_tokens || 0) - cache5m - cache1h,
+  );
   const cacheRead = u.cache_read_input_tokens || 0;
   return (
     inputTokens * pricing.input +
     outputTokens * pricing.output +
-    cache5m * pricing.cache5m +
+    (cache5m + unclassifiedCacheWrite) * pricing.cache5m +
     cache1h * pricing.cache1h +
     cacheRead * pricing.cacheRead
   ) / 1_000_000;
 }
 
-type OpenAIPricing = { input: number; cachedInput: number; output: number };
-const OPENAI_PRICING: Record<string, OpenAIPricing> = {
-  'gpt-5.6-sol': { input: 5.00, cachedInput: 0.50, output: 30.00 },
-  'gpt-5.6-terra': { input: 2.50, cachedInput: 0.25, output: 15.00 },
-  'gpt-5.6-luna': { input: 1.00, cachedInput: 0.10, output: 6.00 },
-  'gpt-5.5': { input: 5.00, cachedInput: 0.50, output: 30.00 },
-  'gpt-5.4': { input: 2.50, cachedInput: 0.25, output: 15.00 },
-  'gpt-5.3-codex': { input: 1.75, cachedInput: 0.175, output: 14.00 },
-  'gpt-5.4-mini': { input: 0.75, cachedInput: 0.075, output: 4.50 },
+type TokenPricing = { input: number; cachedInput: number; output: number };
+type TieredTokenPricing = {
+  short: TokenPricing;
+  long?: TokenPricing;
+  longContextThreshold?: number;
 };
 
-function computeOpenAIEntryCost(entry: Entry): number {
+// Standard OpenAI API rates per 1M tokens:
+// https://developers.openai.com/api/docs/pricing
+const OPENAI_PRICING: Record<string, TieredTokenPricing> = {
+  'gpt-5.6-sol': {
+    short: { input: 5.00, cachedInput: 0.50, output: 30.00 },
+    long: { input: 10.00, cachedInput: 1.00, output: 45.00 },
+    longContextThreshold: 272_000,
+  },
+  'gpt-5.6-terra': {
+    short: { input: 2.00, cachedInput: 0.20, output: 12.00 },
+    long: { input: 4.00, cachedInput: 0.40, output: 18.00 },
+    longContextThreshold: 272_000,
+  },
+  'gpt-5.6-luna': {
+    short: { input: 0.20, cachedInput: 0.02, output: 1.20 },
+    long: { input: 0.40, cachedInput: 0.04, output: 1.80 },
+    longContextThreshold: 272_000,
+  },
+  'gpt-5.5': {
+    short: { input: 5.00, cachedInput: 0.50, output: 30.00 },
+    long: { input: 10.00, cachedInput: 1.00, output: 45.00 },
+    longContextThreshold: 272_000,
+  },
+  'gpt-5.4': {
+    short: { input: 2.50, cachedInput: 0.25, output: 15.00 },
+    long: { input: 5.00, cachedInput: 0.50, output: 22.50 },
+    longContextThreshold: 272_000,
+  },
+  'gpt-5.3-codex': {
+    short: { input: 1.75, cachedInput: 0.175, output: 14.00 },
+  },
+  'gpt-5.4-mini': {
+    short: { input: 0.75, cachedInput: 0.075, output: 4.50 },
+  },
+};
+
+type TokenUsageSummary = {
+  inputTokens: number;
+  cachedTokens: number;
+  outputTokens: number;
+};
+
+function tokenUsageSummary(usage: any): TokenUsageSummary {
+  const inputTokens = usage?.input_tokens ?? usage?.prompt_tokens ?? 0;
+  const cachedTokens = Math.min(
+    inputTokens,
+    usage?.input_tokens_details?.cached_tokens
+      ?? usage?.prompt_tokens_details?.cached_tokens
+      ?? 0,
+  );
+  return {
+    inputTokens,
+    cachedTokens,
+    outputTokens: usage?.output_tokens ?? usage?.completion_tokens ?? 0,
+  };
+}
+
+function computeTieredTokenCost(
+  usage: any,
+  pricing: TieredTokenPricing,
+  longContextInclusive = false,
+): number {
+  const { inputTokens, cachedTokens, outputTokens } = tokenUsageSummary(usage);
+  const threshold = pricing.longContextThreshold;
+  const usesLongPricing = Boolean(
+    pricing.long && threshold != null &&
+    (longContextInclusive ? inputTokens >= threshold : inputTokens > threshold),
+  );
+  const rate = usesLongPricing ? pricing.long! : pricing.short;
+  const uncachedInputTokens = Math.max(0, inputTokens - cachedTokens);
+  return (
+    uncachedInputTokens * rate.input +
+    cachedTokens * rate.cachedInput +
+    outputTokens * rate.output
+  ) / 1_000_000;
+}
+
+export function computeOpenAIEntryCost(entry: Entry): number {
   const pricing = entry.model ? OPENAI_PRICING[entry.model] : undefined;
   if (!pricing) return 0;
-  const u = entry.usage || {};
-  const inputTokens = u.input_tokens || 0;
-  const cachedTokens = Math.min(inputTokens, u.input_tokens_details?.cached_tokens || 0);
-  const uncachedInputTokens = Math.max(0, inputTokens - cachedTokens);
-  const outputTokens = u.output_tokens || 0;
-  return (
-    uncachedInputTokens * pricing.input +
-    cachedTokens * pricing.cachedInput +
-    outputTokens * pricing.output
-  ) / 1_000_000;
+  return computeTieredTokenCost(entry.usage, pricing);
+}
+
+// Standard xAI API rates per 1M tokens:
+// https://docs.x.ai/developers/pricing
+const GROK_PRICING: Record<string, TieredTokenPricing> = {
+  'grok-4.5': {
+    short: { input: 2.00, cachedInput: 0.30, output: 6.00 },
+    long: { input: 4.00, cachedInput: 0.60, output: 12.00 },
+    longContextThreshold: 200_000,
+  },
+  'grok-4.6': {
+    short: { input: 2.00, cachedInput: 0.50, output: 6.00 },
+    long: { input: 4.00, cachedInput: 1.00, output: 12.00 },
+    longContextThreshold: 200_000,
+  },
+};
+
+function grokPricing(model: string | null | undefined): TieredTokenPricing | undefined {
+  if (!model) return undefined;
+  if (model === 'grok-build-latest' || model === 'grok-4.5-latest') {
+    return GROK_PRICING['grok-4.5'];
+  }
+  return GROK_PRICING[model];
+}
+
+export function computeGrokEntryCost(entry: Entry): number {
+  const pricing = grokPricing(entry.model);
+  if (!pricing) return 0;
+  return computeTieredTokenCost(entry.usage, pricing, true);
 }
 
 function formatCost(cost: number): string {
@@ -216,6 +327,7 @@ async function main(): Promise<void> {
   const byKey = new Map<string, Map<string, Map<string, Bucket>>>();
   const claudeCostByKeyMonthBucket = new Map<string, Map<string, Map<string, number>>>();
   const openaiCostByKeyMonth = new Map<string, Map<string, number>>();
+  const grokCostByKeyMonth = new Map<string, Map<string, number>>();
 
   for (const log of logs) {
     const entries = await readEntries(log.path);
@@ -229,7 +341,7 @@ async function main(): Promise<void> {
       else bk = '(total)';
       const bucket = monthMap.get(bk) || monthMap.set(bk, emptyBucket()).get(bk)!;
       applyEntry(bucket, entry);
-      const cost = computeEntryCost(entry);
+      const cost = computeClaudeEntryCost(entry);
       if (cost > 0) {
         const ck = claudeCostByKeyMonthBucket.get(log.keyId)
           || claudeCostByKeyMonthBucket.set(log.keyId, new Map()).get(log.keyId)!;
@@ -241,6 +353,12 @@ async function main(): Promise<void> {
         const ok = openaiCostByKeyMonth.get(log.keyId) || openaiCostByKeyMonth.set(log.keyId, new Map()).get(log.keyId)!;
         ok.set(log.month, (ok.get(log.month) || 0) + openaiCost);
       }
+      const grokCost = computeGrokEntryCost(entry);
+      if (grokCost > 0) {
+        const gk = grokCostByKeyMonth.get(log.keyId)
+          || grokCostByKeyMonth.set(log.keyId, new Map()).get(log.keyId)!;
+        gk.set(log.month, (gk.get(log.month) || 0) + grokCost);
+      }
     }
   }
 
@@ -251,13 +369,15 @@ async function main(): Promise<void> {
       for (const [month, monthMap] of keyMap) {
         const costMap = claudeCostByKeyMonthBucket.get(keyId)?.get(month);
         const openaiCost = openaiCostByKeyMonth.get(keyId)?.get(month) || 0;
+        const grokCost = grokCostByKeyMonth.get(keyId)?.get(month) || 0;
         const claudeCosts = costMap ? Object.fromEntries(costMap) : {};
         const totalClaudeCost = Object.values(claudeCosts).reduce((a, b) => a + b, 0);
         out[keyId][month] = {
           ...Object.fromEntries(monthMap),
-          _cost_estimate_usd: totalClaudeCost,
+          _cost_estimate_usd: totalClaudeCost + openaiCost + grokCost,
           _claude_cost_by_bucket_usd: claudeCosts,
           _openai_cost_estimate_usd: openaiCost,
+          _grok_cost_estimate_usd: grokCost,
         };
       }
     }
@@ -272,6 +392,7 @@ async function main(): Promise<void> {
       console.log(`  ${month}`);
       const monthMap = keyMap.get(month)!;
       const openaiCost = openaiCostByKeyMonth.get(keyId)?.get(month) || 0;
+      const grokCost = grokCostByKeyMonth.get(keyId)?.get(month) || 0;
       const claudeCostMap = claudeCostByKeyMonthBucket.get(keyId)?.get(month);
       for (const bk of Array.from(monthMap.keys()).sort()) {
         const usageFields = keyId.startsWith('openai-') && bk === '(total)'
@@ -283,19 +404,24 @@ async function main(): Promise<void> {
           const label = bk.startsWith('(') && bk.endsWith(')') ? bk.slice(1, -1) : bk;
           console.log(`    estimated cost (${label}): ${formatCost(bucketCost)}`);
         }
-        if (bk === '(total)' && openaiCost > 0) {
-          console.log(`    estimated cost (openai): ${formatCost(openaiCost)}`);
-        }
       }
       if (claudeCostMap && claudeCostMap.size > 1) {
         const total = Array.from(claudeCostMap.values()).reduce((a, b) => a + b, 0);
         console.log(`    estimated cost (claude total): ${formatCost(total)}`);
       }
+      if (openaiCost > 0) {
+        console.log(`    estimated cost (openai): ${formatCost(openaiCost)}`);
+      }
+      if (grokCost > 0) {
+        console.log(`    estimated cost (grok): ${formatCost(grokCost)}`);
+      }
     }
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (import.meta.main) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

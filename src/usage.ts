@@ -25,16 +25,27 @@ export function listKeyIds(): string[] {
   return Array.from(KEY_TO_ID.values());
 }
 
-export function pickHeaderExtras(headers: Headers, names: string[]): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const name of names) {
-    const v = headers.get(name);
-    if (typeof v === 'string' && v.length > 0) {
-      out[name] = v;
+const USAGE_SESSION_HEADERS = [
+  'x-claude-code-session-id',
+  'x-grok-session-id',
+  'x-opencode-session',
+  'x-session-affinity',
+  'session-id',
+  'x-session-id',
+];
+
+export function requestUsageExtras(req: Request): Record<string, string> {
+  const extras: Record<string, string> = {};
+  for (const name of USAGE_SESSION_HEADERS) {
+    const value = req.headers.get(name);
+    if (value) {
+      extras[name] = value;
       break;
     }
   }
-  return out;
+  const userAgent = req.headers.get('user-agent');
+  if (userAgent) extras['user-agent'] = userAgent;
+  return extras;
 }
 
 function currentMonth(date: Date = new Date()): string {

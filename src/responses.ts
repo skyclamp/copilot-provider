@@ -1,5 +1,5 @@
 import { buildResponseHeaders, getProxyContext, isRecord } from './proxy.ts';
-import { pickHeaderExtras, pipeAndExtractUsage } from './usage.ts';
+import { pipeAndExtractUsage, requestUsageExtras } from './usage.ts';
 import type { RequestContext } from './types.ts';
 
 export async function proxyResponses(ctx: RequestContext): Promise<Response> {
@@ -35,19 +35,12 @@ export async function proxyResponses(ctx: RequestContext): Promise<Response> {
     }
 
     if (upstream.body) {
-      const extras = pickHeaderExtras(req.headers, [
-        'x-session-id',
-        'x-session-affinity',
-        'x-opencode-session',
-      ]);
-      const ua = req.headers.get('user-agent');
-      if (ua) extras['user-agent'] = ua;
       return pipeAndExtractUsage(upstream, respHeaders, {
         endpoint: 'responses',
         keyId: apiKeyId,
         stream: Boolean(body.stream),
         requestModel: typeof body.model === 'string' ? body.model : null,
-        extras,
+        extras: requestUsageExtras(req),
       });
     }
 

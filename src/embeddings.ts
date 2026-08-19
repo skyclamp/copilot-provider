@@ -1,5 +1,5 @@
 import { buildResponseHeaders, getProxyContext, isRecord } from './proxy.ts';
-import { pipeAndExtractUsage } from './usage.ts';
+import { pipeAndExtractUsage, requestUsageExtras } from './usage.ts';
 import type { RequestContext } from './types.ts';
 
 export async function proxyEmbeddings(ctx: RequestContext): Promise<Response> {
@@ -40,6 +40,7 @@ export async function proxyEmbeddings(ctx: RequestContext): Promise<Response> {
         keyId: apiKeyId,
         stream: false,
         requestModel: typeof body.model === 'string' ? body.model : null,
+        extras: requestUsageExtras(req),
       });
     }
 
