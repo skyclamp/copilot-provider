@@ -23,7 +23,7 @@
 
 仅 `/v1/messages` 做 model 名称映射（`MODEL_ALIASES`），其余端点原样透传 model。
 
-`/v1/messages` 对 `anthropic-beta` header 应用白名单：只保留前缀匹配 `interleaved-thinking`、`context-management`、`advanced-tool-use` 的 flag（允许任意 date 后缀），其余静默丢弃。白名单来源于 vscode 代码库的 `src/vs/platform/agentHost/node/claude/anthropicBetas.ts`。
+`/v1/messages` 将 `anthropic-beta` header 原值透传，不做白名单过滤。
 
 ## 流式转发
 

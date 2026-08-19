@@ -78,8 +78,7 @@ matching handler.
 ### Proxy contract (do not break)
 
 - **Pass-through by default.** Don't validate or rewrite the request body
-  beyond what's already done (model alias mapping, `anthropic-beta` cleanup,
-  structured-output rewrite).
+  beyond model alias mapping. Forward `anthropic-beta` unchanged.
 - **Errors are pass-through too.** Forward upstream status + body verbatim;
   only synthesise a `502` when the proxy itself fails.
 - **Streaming uses `pipeAndExtractUsage()`** — it tees the upstream
@@ -99,9 +98,8 @@ matching handler.
   `claude-opus-4.7`, `claude-opus-4.8` and `claude-sonnet-4.6` all support 1M
   context and the full `low`…`max` thinking range natively, so the request
   `model` + `output_config.effort` are forwarded unchanged.
-- Structured output (`output_config.format`) is rewritten onto
-  `/chat/completions` (see `messages-structured-output.ts`) because
-  `claude-opus-4.7` does not support it natively on `/v1/messages`.
+- Structured output (`output_config.format`) is forwarded unchanged to
+  `/v1/messages`; there is no `/chat/completions` rewrite.
 
 ### Auth
 

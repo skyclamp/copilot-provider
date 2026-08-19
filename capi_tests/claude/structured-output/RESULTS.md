@@ -37,10 +37,9 @@ with a root-level `{"message": ...}` envelope (distinct from the Anthropic
 `{error:{type,message}}` shape returned by the supported backends), which means
 4.7 is routed to a backend that does not accept the parameter at all.
 
-This is a change from the situation the proxy was built for, where
-structured-output requests had to be rewritten onto `/chat/completions` (see
-`src/messages-structured-output.ts`). The rewrite is still required for the
-models where native support is absent (e.g. `claude-opus-4.7`).
+The proxy now forwards structured-output requests directly to `/v1/messages`.
+Models where native support is absent (for example `claude-opus-4.7`) return
+the upstream CAPI error unchanged.
 
 The one caveat on the supported backends: CAPI rejects a `name` field inside
 `output_config.format` (`Extra inputs are not permitted`). Only `type` +
@@ -137,6 +136,5 @@ Upstream response (400):
 - A `supported` verdict means CAPI accepted `output_config.format` *and*
   returned schema-valid JSON. The probe validates the response's required keys
   but does not exhaustively validate every JSON Schema constraint.
-- The proxy in `src/messages-structured-output.ts` still rewrites
-  structured-output requests onto `/chat/completions`. Given native support is
-  now present, that workaround may no longer be necessary for this model.
+- The proxy forwards structured-output requests directly to `/v1/messages`.
+  Models without native support return the upstream CAPI error unchanged.
