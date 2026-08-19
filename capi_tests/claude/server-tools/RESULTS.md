@@ -52,7 +52,7 @@ Upstream response (400):
 
 Background: in Copilot's product surface, `web_search` is exposed via the
 GitHub MCP server (`https://api.githubcopilot.com/mcp/readonly`) rather than
-as an Anthropic server tool. See `docs/web-search-mcp.md` for the MCP wiring.
+as an Anthropic server tool.
 
 ### `web_fetch_20260209` — unsupported
 
@@ -68,12 +68,10 @@ Upstream response (400):
 { "error": { "message": "rejected tool(s): web_fetch", "code": "invalid_request_body" } }
 ```
 
-Background: Copilot has its own client-side built-in `web_fetch` (see
-`docs/web-fetch-implementation.md`), so CAPI explicitly blocks attempts to
-redefine the same tool name as a versioned Anthropic server tool. Note the
-contract differs from `web_search`: this is a tool-name rejection
-(`invalid_request_body`), not an unsupported server-tool type
-(`unsupported_value`).
+Background: CAPI explicitly blocks attempts to define `web_fetch` as a
+versioned Anthropic server tool. Note the contract differs from `web_search`:
+this is a tool-name rejection (`invalid_request_body`), not an unsupported
+server-tool type (`unsupported_value`).
 
 ### `code_execution_20260120` — unsupported
 
