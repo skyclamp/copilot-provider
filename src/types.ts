@@ -1,7 +1,10 @@
+import type { SessionEventLogger } from './session-log.ts';
+
 export type RequestContext = {
   req: Request;
   body: unknown;
   apiKeyId: string;
+  sessionLogger: SessionEventLogger | null;
 };
 
 export type EndpointHandler = (ctx: RequestContext) => Promise<Response>;

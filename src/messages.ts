@@ -37,11 +37,14 @@ export async function proxyMessages(ctx: RequestContext): Promise<Response> {
       `[proxy] ${String(body.model)} stream=${Boolean(body.stream)} effort=${effort} thinking=${thinkingType} key=${apiKeyId}`,
     );
 
-    const upstream = await fetch(`${apiBase}/v1/messages`, {
+    const upstreamResponse = await fetch(`${apiBase}/v1/messages`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
     });
+    const upstream = ctx.sessionLogger
+      ? await ctx.sessionLogger.response(upstreamResponse)
+      : upstreamResponse;
 
     const respHeaders = buildResponseHeaders(upstream);
 
@@ -64,9 +67,10 @@ export async function proxyMessages(ctx: RequestContext): Promise<Response> {
     return new Response(null, { status: upstream.status, headers: respHeaders });
   } catch (error) {
     console.error('[proxy] Error:', error);
-    return new Response(
+    const response = new Response(
       JSON.stringify({ type: 'error', error: { type: 'proxy_error', message: String(error) } }),
       { status: 502, headers: { 'Content-Type': 'application/json' } },
     );
+    return ctx.sessionLogger ? ctx.sessionLogger.response(response) : response;
   }
 }

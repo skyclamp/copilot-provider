@@ -17,11 +17,14 @@ export async function proxyEmbeddings(ctx: RequestContext): Promise<Response> {
       `[proxy] embeddings model=${String(body.model)} inputs=${inputCount} dimensions=${body.dimensions ?? 'default'} key=${apiKeyId}`,
     );
 
-    const upstream = await fetch(`${apiBase}/embeddings`, {
+    const upstreamResponse = await fetch(`${apiBase}/embeddings`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
     });
+    const upstream = ctx.sessionLogger
+      ? await ctx.sessionLogger.response(upstreamResponse)
+      : upstreamResponse;
 
     const respHeaders = buildResponseHeaders(upstream);
 
@@ -43,9 +46,10 @@ export async function proxyEmbeddings(ctx: RequestContext): Promise<Response> {
     return new Response(null, { status: upstream.status, headers: respHeaders });
   } catch (error) {
     console.error('[proxy] Embeddings error:', error);
-    return new Response(
+    const response = new Response(
       JSON.stringify({ type: 'error', error: { type: 'proxy_error', message: String(error) } }),
       { status: 502, headers: { 'Content-Type': 'application/json' } },
     );
+    return ctx.sessionLogger ? ctx.sessionLogger.response(response) : response;
   }
 }
