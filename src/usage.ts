@@ -1,6 +1,7 @@
 import { dirname, resolve } from 'node:path';
 import { appendFile, mkdir } from 'node:fs/promises';
 import keys from './keys.json' with { type: 'json' };
+import { requestSessionIdentity } from './session.ts';
 
 const MODULE_DIR = dirname(new URL(import.meta.url).pathname);
 const USAGE_DIR = resolve(MODULE_DIR, '..', 'usage');
@@ -21,28 +22,10 @@ export function resolveKeyId(key: string | null | undefined): string | null {
   return KEY_TO_ID.get(key) ?? null;
 }
 
-export function listKeyIds(): string[] {
-  return Array.from(KEY_TO_ID.values());
-}
-
-const USAGE_SESSION_HEADERS = [
-  'x-claude-code-session-id',
-  'x-grok-session-id',
-  'x-opencode-session',
-  'x-session-affinity',
-  'session-id',
-  'x-session-id',
-];
-
 export function requestUsageExtras(req: Request): Record<string, string> {
   const extras: Record<string, string> = {};
-  for (const name of USAGE_SESSION_HEADERS) {
-    const value = req.headers.get(name);
-    if (value) {
-      extras[name] = value;
-      break;
-    }
-  }
+  const identity = requestSessionIdentity(req);
+  if (identity) extras[identity.header] = identity.sessionId;
   const userAgent = req.headers.get('user-agent');
   if (userAgent) extras['user-agent'] = userAgent;
   return extras;
@@ -99,21 +82,35 @@ export class SSEUsageParser {
 
   feed(chunk: string): void {
     this.buffer += chunk;
-    let idx: number;
-    while ((idx = this.buffer.indexOf('\n\n')) !== -1) {
-      const raw = this.buffer.slice(0, idx);
-      this.buffer = this.buffer.slice(idx + 2);
+    if (this.buffer.startsWith('\uFEFF')) this.buffer = this.buffer.slice(1);
+
+    let boundary = this.buffer.match(/\r\n\r\n|\n\n|\r\r/);
+    while (boundary?.index != null) {
+      const raw = this.buffer.slice(0, boundary.index);
+      this.buffer = this.buffer.slice(boundary.index + boundary[0].length);
       this._parseEvent(raw);
+      boundary = this.buffer.match(/\r\n\r\n|\n\n|\r\r/);
     }
+  }
+
+  finish(): void {
+    if (this.buffer) this._parseEvent(this.buffer);
+    this.buffer = '';
   }
 
   private _parseEvent(raw: string): void {
     let eventType = '';
-    let dataStr = '';
-    for (const line of raw.split('\n')) {
-      if (line.startsWith('event:')) eventType = line.slice(6).trim();
-      else if (line.startsWith('data:')) dataStr += line.slice(5).trimStart();
+    const dataLines: string[] = [];
+    for (const line of raw.split(/\r\n|\r|\n/)) {
+      if (!line || line.startsWith(':')) continue;
+      const separator = line.indexOf(':');
+      const field = separator === -1 ? line : line.slice(0, separator);
+      let value = separator === -1 ? '' : line.slice(separator + 1);
+      if (value.startsWith(' ')) value = value.slice(1);
+      if (field === 'event') eventType = value;
+      else if (field === 'data') dataLines.push(value);
     }
+    const dataStr = dataLines.join('\n');
     if (!dataStr || dataStr === '[DONE]') return;
     let data: any;
     try {
@@ -182,7 +179,7 @@ export function pipeAndExtractUsage(
 ): Response {
   const status = upstream.status;
   const contentType = upstream.headers.get('content-type') || '';
-  const isSSE = contentType.includes('text/event-stream') || opts.stream;
+  const isSSE = contentType.toLowerCase().includes('text/event-stream') || opts.stream;
 
   if (!upstream.body) {
     return new Response(null, { status, headers: respHeaders });
@@ -206,6 +203,13 @@ export function pipeAndExtractUsage(
         const text = decoder.decode(value, { stream: true });
         if (parser) parser.feed(text);
         else jsonBuffer += text;
+      }
+      const tail = decoder.decode();
+      if (parser) {
+        if (tail) parser.feed(tail);
+        parser.finish();
+      } else {
+        jsonBuffer += tail;
       }
     } catch (err) {
       console.error(`[usage] stream error for ${opts.endpoint}:`, err);

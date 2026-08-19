@@ -96,7 +96,7 @@ export type CallCapiOptions = {
   body: object;
   /** Set to true to request SSE (Accept: text/event-stream). */
   stream?: boolean;
-  /** Extra headers (e.g. `anthropic-beta`, `anthropic-version`). Wins over endpoint defaults. */
+  /** Extra headers (e.g. `anthropic-beta`). Wins over endpoint defaults. */
   extraHeaders?: Record<string, string>;
 };
 
@@ -111,7 +111,6 @@ export async function callCapiMessages(opts: CallCapiOptions): Promise<CapiCallR
   const apiBase = getCopilotApiBase(tokenResp);
   const url = `${apiBase}/v1/messages`;
   const headers = {
-    'anthropic-version': '2023-06-01',
     ...buildCapiHeaders(tokenResp.token),
     ...(opts.stream ? { Accept: 'text/event-stream' } : {}),
     ...(opts.extraHeaders ?? {}),

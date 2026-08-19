@@ -1,18 +1,21 @@
 import { appendFile, mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
+import { requestSessionIdentity } from './session.ts';
 
 const MODULE_DIR = dirname(new URL(import.meta.url).pathname);
 const LOG_DIR = resolve(MODULE_DIR, '..', 'logs');
 const REDACTED = '[REDACTED]';
-const pendingWrites = new Map<string, Promise<void>>();
-let logDirReady: Promise<void> | null = null;
+const FLUSH_INTERVAL_MS = 20;
+const MAX_BUFFER_CHARS = 64 * 1024;
 
-type ProductPrefix = 'cc' | 'cx' | 'oc' | 'gb';
-
-type SessionIdentity = {
-  prefix: ProductPrefix;
-  sessionId: string;
+type Appender = {
+  buffer: string;
+  timer: ReturnType<typeof setTimeout> | null;
+  tail: Promise<void>;
 };
+
+const appenders = new Map<string, Appender>();
+let logDirReady: Promise<void> | null = null;
 
 function headerRecord(headers: Headers): Record<string, string> {
   const result: Record<string, string> = {};
@@ -22,32 +25,6 @@ function headerRecord(headers: Headers): Record<string, string> {
       : value;
   }
   return result;
-}
-
-function sessionIdentity(req: Request): SessionIdentity | null {
-  const knownHeaders: Array<[string, ProductPrefix]> = [
-    ['x-claude-code-session-id', 'cc'],
-    ['x-grok-session-id', 'gb'],
-    ['x-opencode-session', 'oc'],
-    ['x-session-affinity', 'oc'],
-    ['session-id', 'cx'],
-  ];
-
-  for (const [name, prefix] of knownHeaders) {
-    const sessionId = req.headers.get(name)?.trim();
-    if (sessionId) return { prefix, sessionId };
-  }
-
-  const sessionId = req.headers.get('x-session-id')?.trim();
-  if (!sessionId) return null;
-
-  const userAgent = req.headers.get('user-agent')?.toLowerCase() ?? '';
-  if (userAgent.includes('opencode')) return { prefix: 'oc', sessionId };
-  if (userAgent.includes('grok-shell') || userAgent.includes('xai-grok-build')) {
-    return { prefix: 'gb', sessionId };
-  }
-  if (userAgent.includes('claude')) return { prefix: 'cc', sessionId };
-  return { prefix: 'cx', sessionId };
 }
 
 function safeSessionId(sessionId: string): string {
@@ -69,21 +46,57 @@ function ensureLogDir(): Promise<void> {
   return logDirReady;
 }
 
-function appendRecord(path: string, record: Record<string, unknown>): Promise<void> {
-  const previous = pendingWrites.get(path) ?? Promise.resolve();
-  const next = previous
+function scheduleFlush(path: string, appender: Appender): void {
+  if (appender.timer) return;
+  appender.timer = setTimeout(() => {
+    appender.timer = null;
+    void flushAppender(path, appender);
+  }, FLUSH_INTERVAL_MS);
+}
+
+function flushAppender(path: string, appender: Appender): Promise<void> {
+  if (appender.timer) {
+    clearTimeout(appender.timer);
+    appender.timer = null;
+  }
+  if (!appender.buffer) return appender.tail;
+
+  const content = appender.buffer;
+  appender.buffer = '';
+  const next = appender.tail
     .then(async () => {
       await ensureLogDir();
-      await appendFile(path, `${JSON.stringify(record)}\n`);
+      await appendFile(path, content);
     })
     .catch(error => {
       console.error(`[session-log] failed to append ${JSON.stringify(path)}:`, error);
     });
-  pendingWrites.set(path, next);
+  appender.tail = next;
   void next.finally(() => {
-    if (pendingWrites.get(path) === next) pendingWrites.delete(path);
+    if (appender.tail !== next) return;
+    if (appender.buffer) scheduleFlush(path, appender);
+    else if (!appender.timer) appenders.delete(path);
   });
   return next;
+}
+
+function appendRecord(path: string, record: Record<string, unknown>): void {
+  let appender = appenders.get(path);
+  if (!appender) {
+    appender = { buffer: '', timer: null, tail: Promise.resolve() };
+    appenders.set(path, appender);
+  }
+  appender.buffer += `${JSON.stringify(record)}\n`;
+  if (appender.buffer.length >= MAX_BUFFER_CHARS) void flushAppender(path, appender);
+  else scheduleFlush(path, appender);
+}
+
+export async function flushSessionLogs(): Promise<void> {
+  const pending: Promise<void>[] = [];
+  for (const [path, appender] of appenders) {
+    pending.push(flushAppender(path, appender));
+  }
+  await Promise.all(pending);
 }
 
 export type SessionEventLogger = {
@@ -92,26 +105,26 @@ export type SessionEventLogger = {
 };
 
 export function createSessionEventLogger(req: Request): SessionEventLogger | null {
-  const identity = sessionIdentity(req);
+  const identity = requestSessionIdentity(req);
   if (!identity) return null;
 
   const logPath = resolve(LOG_DIR, `${identity.prefix}-${safeSessionId(identity.sessionId)}.jsonl`);
   const requestId = crypto.randomUUID();
   const includeChunkContent = Bun.env.LOG_CHUNK_CONTENT === 'true';
 
-  function write(record: Record<string, unknown>): Promise<void> {
-    return appendRecord(logPath, { ts: Date.now(), requestId, ...record });
+  function write(record: Record<string, unknown>): void {
+    appendRecord(logPath, { ts: Date.now(), requestId, ...record });
   }
 
   async function response(upstream: Response): Promise<Response> {
-    void write({
+    write({
       event: 'response_start',
       status: upstream.status,
       headers: headerRecord(upstream.headers),
     });
 
     if (!upstream.body) {
-      await write({ event: 'response_end', complete: true });
+      write({ event: 'response_end', complete: true });
       return upstream;
     }
 
@@ -119,10 +132,10 @@ export function createSessionEventLogger(req: Request): SessionEventLogger | nul
     const decoder = includeChunkContent ? new TextDecoder() : null;
     let ended = false;
 
-    async function end(complete: boolean): Promise<void> {
+    function end(complete: boolean): void {
       if (ended) return;
       ended = true;
-      await write({ event: 'response_end', complete });
+      write({ event: 'response_end', complete });
     }
 
     const body = new ReadableStream<Uint8Array>({
@@ -130,17 +143,17 @@ export function createSessionEventLogger(req: Request): SessionEventLogger | nul
         try {
           const { done, value } = await reader.read();
           if (done) {
-            await end(true);
+            end(true);
             controller.close();
             return;
           }
 
           const chunkRecord: Record<string, unknown> = { event: 'chunk' };
           if (decoder) chunkRecord.content = decoder.decode(value, { stream: true });
-          void write(chunkRecord);
+          write(chunkRecord);
           controller.enqueue(value);
         } catch (error) {
-          await end(false);
+          end(false);
           controller.error(error);
         }
       },
@@ -148,7 +161,7 @@ export function createSessionEventLogger(req: Request): SessionEventLogger | nul
         try {
           await reader.cancel(reason);
         } finally {
-          await end(false);
+          end(false);
         }
       },
     });
@@ -162,7 +175,7 @@ export function createSessionEventLogger(req: Request): SessionEventLogger | nul
 
   return {
     request(method: string, path: string): void {
-      void write({
+      write({
         event: 'request',
         method,
         path,

@@ -1,18 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { getCopilotToken, getCopilotApiBaseUrl } from './copilot-token.ts';
 import { MODEL_ALIASES } from './constants.ts';
+import { requestSessionIdentity } from './session.ts';
 import type { ProxyContext } from './types.ts';
 
 type DeviceInfo = {
   vscodeMachineId: string;
   editorDeviceId: string;
 };
-
-const AGENT_SESSION_HEADERS = [
-  'x-claude-code-session-id', // claude code
-  'session-id', // codex
-  'x-session-affinity', // opencode
-];
 
 function getDeviceInfo(): DeviceInfo {
   const vscodeMachineId = Bun.env.VSCODE_MACHINE_ID;
@@ -24,12 +19,7 @@ function getDeviceInfo(): DeviceInfo {
 }
 
 function detectAgentSessionId(req: Request | undefined): string | undefined {
-  if (!req) return undefined;
-  for (const name of AGENT_SESSION_HEADERS) {
-    const value = req.headers.get(name);
-    if (value) return value;
-  }
-  return undefined;
+  return req ? requestSessionIdentity(req)?.sessionId : undefined;
 }
 
 function buildHeaders(
@@ -43,6 +33,7 @@ function buildHeaders(
 
   const headers: Record<string, string> = {
     Authorization: `Bearer ${copilotToken}`,
+    'Content-Type': 'application/json',
     'X-GitHub-Api-Version': apiVersion,
     'VScode-MachineId': device.vscodeMachineId,
     'Editor-Device-Id': device.editorDeviceId,

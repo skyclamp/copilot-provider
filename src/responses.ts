@@ -6,7 +6,7 @@ export async function proxyResponses(ctx: RequestContext): Promise<Response> {
   try {
     const { req, apiKeyId } = ctx;
     const { apiBase, headers } = await getProxyContext(req);
-    const body: Record<string, unknown> = isRecord(ctx.body) ? { ...ctx.body } : {};
+    const body = { ...ctx.body };
 
     const accept = req.headers.get('accept');
     if (accept) headers.Accept = accept;

@@ -1,21 +1,20 @@
 import { proxyChatCompletions } from './chat-completions.ts';
-import { proxyEmbeddings } from './embeddings.ts';
 import { proxyMessages } from './messages.ts';
 import { proxyResponses } from './responses.ts';
 import { createSessionEventLogger } from './session-log.ts';
 import { resolveKeyId } from './usage.ts';
 import type { EndpointHandler, RequestContext } from './types.ts';
 
-const JSON_NULL_HEADERS = { 'Content-Type': 'application/json' } as const;
+const JSON_HEADERS = { 'Content-Type': 'application/json' } as const;
 
 function notFound(method: string, path: string): Response {
   console.log(`[404] ${method} ${path}`);
-  return new Response('null', { status: 404, headers: JSON_NULL_HEADERS });
+  return new Response('null', { status: 404, headers: JSON_HEADERS });
 }
 
 function rejectUnauthorized(method: string, path: string, authType: string): Response {
   console.log(`[403] ${method} ${path} — invalid ${authType}`);
-  return new Response('null', { status: 404, headers: JSON_NULL_HEADERS });
+  return new Response('null', { status: 404, headers: JSON_HEADERS });
 }
 
 function resolveProvidedKey(rawKey: string | null | undefined): { ok: true; keyId: string } | { ok: false } {
@@ -40,19 +39,48 @@ function getApiKeyId(req: Request, scheme: AuthScheme): string | null {
   return result.ok ? result.keyId : null;
 }
 
-async function readJsonBody(req: Request): Promise<unknown> {
-  const ct = req.headers.get('content-type') || '';
-  if (!ct.toLowerCase().includes('application/json')) return {};
+class RequestBodyError extends Error {
+  constructor(
+    message: string,
+    readonly status: 400 | 415,
+  ) {
+    super(message);
+  }
+}
+
+function isJsonContentType(contentType: string): boolean {
+  const mediaType = contentType.split(';', 1)[0]?.trim().toLowerCase() ?? '';
+  return mediaType === 'application/json' || mediaType.endsWith('+json');
+}
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+async function readJsonObject(req: Request): Promise<Record<string, unknown>> {
+  const contentType = req.headers.get('content-type') ?? '';
+  if (!isJsonContentType(contentType)) {
+    throw new RequestBodyError('content-type must be application/json', 415);
+  }
   const text = await req.text();
-  if (!text) return {};
-  return JSON.parse(text);
+  if (!text) throw new RequestBodyError('request body must be a JSON object', 400);
+
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    throw new RequestBodyError('invalid json', 400);
+  }
+  if (!isJsonObject(value)) {
+    throw new RequestBodyError('request body must be a JSON object', 400);
+  }
+  return value;
 }
 
 const ROUTES: Record<string, { handler: EndpointHandler; scheme: AuthScheme; authLabel: string }> = {
   '/v1/messages': { handler: proxyMessages, scheme: 'x-api-key', authLabel: 'api key' },
   '/v1/responses': { handler: proxyResponses, scheme: 'bearer', authLabel: 'authorization' },
   '/v1/chat/completions': { handler: proxyChatCompletions, scheme: 'bearer', authLabel: 'authorization' },
-  '/v1/embeddings': { handler: proxyEmbeddings, scheme: 'bearer', authLabel: 'authorization' },
 };
 
 async function dispatch(req: Request): Promise<Response> {
@@ -76,13 +104,16 @@ async function dispatch(req: Request): Promise<Response> {
         return respond(rejectUnauthorized(method, path, route.authLabel));
       }
 
-      let body: unknown;
+      let body: Record<string, unknown>;
       try {
-        body = await readJsonBody(req);
-      } catch {
-        return respond(new Response(JSON.stringify({ error: 'invalid json' }), {
-          status: 400,
-          headers: JSON_NULL_HEADERS,
+        body = await readJsonObject(req);
+      } catch (error) {
+        const bodyError = error instanceof RequestBodyError
+          ? error
+          : new RequestBodyError('invalid json', 400);
+        return respond(new Response(JSON.stringify({ error: bodyError.message }), {
+          status: bodyError.status,
+          headers: JSON_HEADERS,
         }));
       }
 

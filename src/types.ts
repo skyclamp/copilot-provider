@@ -2,7 +2,7 @@ import type { SessionEventLogger } from './session-log.ts';
 
 export type RequestContext = {
   req: Request;
-  body: unknown;
+  body: Record<string, unknown>;
   apiKeyId: string;
   sessionLogger: SessionEventLogger | null;
 };

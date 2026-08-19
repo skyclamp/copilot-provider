@@ -30,11 +30,11 @@ bun run setup-device             # generates VSCODE_*/EDITOR_DEVICE_ID for .env
 bun run gen-keys                 # mints input API keys into src/keys.json
 bun run fetch-models -- --token <gh-token>   # prints the upstream Copilot /models payload (debug only)
 bun run usage-stats              # summarises usage/*.jsonl
+bun test                         # automated contract and parser tests
 bun run typecheck                # tsc --noEmit
 ```
 
-There is no test suite and no linter configured. If you add tests, use
-Bun's built-in test runner (`bun test`).
+Tests use Bun's built-in test runner. No linter is configured.
 
 ## Architecture
 
@@ -46,12 +46,10 @@ exposes:
 - `POST /v1/messages` → upstream `{api}/v1/messages` ([src/messages.ts](src/messages.ts))
 - `POST /v1/responses` → upstream `{api}/responses` ([src/responses.ts](src/responses.ts))
 - `POST /v1/chat/completions` → upstream `{api}/chat/completions` ([src/chat-completions.ts](src/chat-completions.ts))
-- `POST /v1/embeddings` → upstream `{api}/embeddings` ([src/embeddings.ts](src/embeddings.ts))
 
 Anything else returns `404 null`. See [docs/design.md](docs/design.md) for
-the upstream-path contract — note that `/v1/responses`,
-`/v1/chat/completions`, and `/v1/embeddings` strip the `/v1` prefix when
-forwarding.
+the upstream-path contract — note that `/v1/responses` and
+`/v1/chat/completions` strip the `/v1` prefix when forwarding.
 
 ### Module layout (`src/`)
 
@@ -64,7 +62,7 @@ forwarding.
 | `messages.ts` | `/v1/messages` proxy: model + effort routing |
 | `responses.ts` | `/v1/responses` proxy |
 | `chat-completions.ts` | `/v1/chat/completions` proxy |
-| `embeddings.ts` | `/v1/embeddings` proxy |
+| `session.ts` | Shared client session identification |
 | `session-log.ts` | Per-session request/response lifecycle JSONL logging |
 | `usage.ts` | API-key resolution, SSE usage parser, `pipeAndExtractUsage()` |
 | `types.ts` | Shared types (`RequestContext`, `ProxyContext`, …) |
@@ -76,27 +74,28 @@ matching handler.
 
 ### Proxy contract (do not break)
 
-- **Pass-through by default.** Don't validate or rewrite the request body
-  beyond model alias mapping. Forward `anthropic-beta` unchanged.
+- **JSON objects only.** Reject missing/invalid/non-object JSON rather than
+  replacing it with an empty object.
+- **Minimal body changes.** Map `/v1/messages` model aliases; otherwise keep
+  the JSON object unchanged. CAPI returns usage by default, so do not inject a
+  usage request field. Forward `anthropic-beta` unchanged and do not forward
+  `anthropic-version`.
 - **Errors are pass-through too.** Forward upstream status + body verbatim;
   only synthesise a `502` when the proxy itself fails.
 - **Streaming uses `pipeAndExtractUsage()`** — it tees the upstream
   `ReadableStream` (one branch becomes the `Response` body, the other is
   consumed in the background to extract usage into
   `usage/<key-id>-YYYY-MM.jsonl`). Don't buffer entire upstream responses.
-- **Only mutate request fields the caller provided.** Never synthesise
-  `output_config` if absent.
+- Never synthesise `output_config` if absent.
 
 ### Model + effort routing (`src/messages.ts`)
 
 - `MODEL_ALIASES` in [src/constants.ts](src/constants.ts) is a **plain static
   map** — no env-reading getters. It resolves friendly aliases to canonical
-  model ids: `opus` / `opus[1m]` → `claude-opus-4.8`, `sonnet` / `sonnet[1m]`
-  → `claude-sonnet-4.6`, `haiku` → `claude-haiku-4.5`.
-- No sub-model fan-out or effort coercion: `claude-opus-4.6`,
-  `claude-opus-4.7`, `claude-opus-4.8` and `claude-sonnet-4.6` all support 1M
-  context and the full `low`…`max` thinking range natively, so the request
-  `model` + `output_config.effort` are forwarded unchanged.
+  model ids: `opus` / `opus[1m]` → `claude-opus-5`, `sonnet` / `sonnet[1m]`
+  → `claude-sonnet-5`, `haiku` → `claude-haiku-4.5`.
+- No sub-model fan-out or effort coercion. The mapped `model` and caller's
+  `output_config.effort` are forwarded unchanged.
 - Structured output (`output_config.format`) is forwarded unchanged to
   `/v1/messages`; there is no `/chat/completions` rewrite.
 
@@ -108,7 +107,7 @@ Two-sided:
    short-lived Copilot token via the device endpoint; cached in memory.
 2. **Incoming** — clients must present an input key from `src/keys.json`:
    - `/v1/messages`: `x-api-key` header
-   - `/v1/responses`, `/v1/chat/completions`, `/v1/embeddings`:
+   - `/v1/responses`, `/v1/chat/completions`:
      `Authorization: Bearer <key>`
    - Set `DISABLE_INPUT_AUTH=true` to bypass (`apiKeyId` becomes
      `'noauth'`).

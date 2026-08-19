@@ -7,6 +7,7 @@ import {
 import type { CopilotTokenResponse } from './types.ts';
 
 let cached: CopilotTokenResponse | null = null;
+let refreshInFlight: Promise<CopilotTokenResponse> | null = null;
 
 function nowInSeconds(): number {
   return Math.floor(Date.now() / 1000);
@@ -24,9 +25,6 @@ function readGitHubToken(): string {
 }
 
 async function exchangeToken(githubToken: string): Promise<CopilotTokenResponse> {
-  const chatVersion = Bun.env.COPILOT_CHAT_VERSION || '0.41.2';
-  const vscodeVersion = Bun.env.VSCODE_VERSION || '1.113.0';
-
   const response = await fetch(`${getGitHubApiBaseUrl()}${GITHUB_COPILOT_TOKEN_PATH}`, {
     method: 'GET',
     headers: {
@@ -50,12 +48,20 @@ async function exchangeToken(githubToken: string): Promise<CopilotTokenResponse>
 
 export async function getCopilotToken(): Promise<CopilotTokenResponse> {
   if (isTokenValid(cached)) return cached;
+  if (refreshInFlight) return refreshInFlight;
 
   const githubToken = readGitHubToken();
-  const token = await exchangeToken(githubToken);
-  cached = token;
-  console.log(`[copilot-token] Refreshed, expires_at=${token.expires_at}, api=${token.endpoints?.api}`);
-  return token;
+  const refresh = exchangeToken(githubToken).then(token => {
+    cached = token;
+    console.log(`[copilot-token] Refreshed, expires_at=${token.expires_at}, api=${token.endpoints?.api}`);
+    return token;
+  });
+  refreshInFlight = refresh;
+  try {
+    return await refresh;
+  } finally {
+    if (refreshInFlight === refresh) refreshInFlight = null;
+  }
 }
 
 export function getCopilotApiBaseUrl(tokenResponse: CopilotTokenResponse): string {

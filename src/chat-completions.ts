@@ -1,4 +1,4 @@
-import { buildResponseHeaders, getProxyContext, isRecord } from './proxy.ts';
+import { buildResponseHeaders, getProxyContext } from './proxy.ts';
 import { pipeAndExtractUsage, requestUsageExtras } from './usage.ts';
 import type { RequestContext } from './types.ts';
 
@@ -6,7 +6,7 @@ export async function proxyChatCompletions(ctx: RequestContext): Promise<Respons
   try {
     const { req, apiKeyId } = ctx;
     const { apiBase, headers } = await getProxyContext(req);
-    const body: Record<string, unknown> = isRecord(ctx.body) ? { ...ctx.body } : {};
+    const body = { ...ctx.body };
 
     const accept = req.headers.get('accept');
     if (accept) headers.Accept = accept;

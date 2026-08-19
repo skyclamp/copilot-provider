@@ -2,9 +2,10 @@
 
 ## 透传原则
 
-三个端点的核心逻辑一致：**不校验、不改写 request body（仅做必要的 model 别名映射），response 原样透传**。
+三个端点仅接受 JSON object。Request body 保持语义不变，仅 `/v1/messages`
+做必要的 model 别名映射。CAPI 默认返回 usage，代理不添加 usage 请求字段。
 
-错误处理也是透传——上游返回什么状态码和 body，就原样转发给客户端。代理层只在自身故障时返回 502。
+上游状态码和 response body 原样转发；代理自身故障返回 502。
 
 ## 路由与上游路径映射
 
@@ -13,9 +14,8 @@
 | `POST /v1/messages` | `{api}/v1/messages` |
 | `POST /v1/responses` | `{api}/responses` |
 | `POST /v1/chat/completions` | `{api}/chat/completions` |
-| `POST /v1/embeddings` | `{api}/embeddings` |
 
-`/v1/responses`、`/v1/chat/completions` 和 `/v1/embeddings` 的上游路径无 `/v1` 前缀。
+`/v1/responses` 和 `/v1/chat/completions` 的上游路径无 `/v1` 前缀。
 
 其他所有请求 → 404。
 
@@ -23,11 +23,13 @@
 
 仅 `/v1/messages` 做 model 名称映射（`MODEL_ALIASES`），其余端点原样透传 model。
 
-`/v1/messages` 将 `anthropic-beta` header 原值透传，不做白名单过滤。
+`/v1/messages` 将 `anthropic-beta` header 原值透传，不做白名单过滤；不向
+CAPI 发送 `anthropic-version`。
 
 ## 流式转发
 
-当 `stream: true` 时，上游返回 `text/event-stream`。代理通过 `ReadableStream` 逐 chunk pipe 到 Express response，不 buffer 整个响应。
+当 `stream: true` 时，上游返回 `text/event-stream`。代理 tee 上游
+`ReadableStream`：一支直接返回客户端，另一支旁路解析 usage。
 
 ## Session 日志
 
@@ -41,6 +43,7 @@
 每次请求依次记录 `request`、`response_start`、每个 `chunk` 和
 `response_end`，时间戳 `ts` 为 epoch 毫秒。Headers 中的认证信息会脱敏。
 仅当 `LOG_CHUNK_CONTENT=true` 时，`chunk` 记录包含 `content`。
+日志按短时间窗口批量 append，落盘不会阻塞 response EOF。
 
 ## 请求 Headers
 
@@ -49,15 +52,12 @@
 ```
 Authorization: Bearer <copilot_token>
 Content-Type: application/json
-User-Agent: GitHubCopilotChat/<COPILOT_CHAT_VERSION>
 X-GitHub-Api-Version: <GITHUB_API_VERSION>
 VScode-SessionId / VScode-MachineId / Editor-Device-Id
-Copilot-Integration-Id: vscode-chat
-OpenAI-Intent: conversation-agent
-X-Interaction-Type: conversation
 X-Request-Id: <uuid>
 Editor-Plugin-Version: copilot-chat/<COPILOT_CHAT_VERSION>
 Editor-Version: vscode/<VSCODE_VERSION>
 ```
 
-响应时转发上游的 `x-request-id`、`x-github-request-id` 和 `Content-Type`。
+响应只保留客户端有用的 `x-request-id` 和 `Content-Type`；其他 CAPI 专用
+response headers 不转发。

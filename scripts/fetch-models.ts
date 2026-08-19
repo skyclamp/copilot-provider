@@ -94,7 +94,6 @@ function getEditorVersions(): { editorVersion: string; editorPluginVersion: stri
 }
 
 function tokenExchangeHeaders(githubToken: string): Record<string, string> {
-  const v = getEditorVersions();
   return {
     Authorization: `token ${githubToken}`,
     'X-GitHub-Api-Version': TOKEN_API_VERSION,
