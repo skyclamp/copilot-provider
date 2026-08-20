@@ -1,7 +1,6 @@
 import { proxyChatCompletions } from './chat-completions.ts';
 import { proxyMessages } from './messages.ts';
 import { proxyResponses } from './responses.ts';
-import { createSessionEventLogger } from './session-log.ts';
 import { resolveKeyId } from './usage.ts';
 import type { EndpointHandler, RequestContext } from './types.ts';
 
@@ -87,13 +86,9 @@ async function dispatch(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const path = url.pathname;
   const method = req.method;
-  const sessionLogger = createSessionEventLogger(req);
-  sessionLogger?.request(method, path);
-  const respond = (response: Response): Promise<Response> =>
-    sessionLogger ? sessionLogger.response(response) : Promise.resolve(response);
 
   if (method === 'HEAD' && path === '/') {
-    return respond(new Response(null, { status: 200 }));
+    return new Response(null, { status: 200 });
   }
 
   if (method === 'POST') {
@@ -101,7 +96,7 @@ async function dispatch(req: Request): Promise<Response> {
     if (route) {
       const apiKeyId = getApiKeyId(req, route.scheme);
       if (!apiKeyId) {
-        return respond(rejectUnauthorized(method, path, route.authLabel));
+        return rejectUnauthorized(method, path, route.authLabel);
       }
 
       let body: Record<string, unknown>;
@@ -111,18 +106,18 @@ async function dispatch(req: Request): Promise<Response> {
         const bodyError = error instanceof RequestBodyError
           ? error
           : new RequestBodyError('invalid json', 400);
-        return respond(new Response(JSON.stringify({ error: bodyError.message }), {
+        return new Response(JSON.stringify({ error: bodyError.message }), {
           status: bodyError.status,
           headers: JSON_HEADERS,
-        }));
+        });
       }
 
-      const ctx: RequestContext = { req, body, apiKeyId, sessionLogger };
+      const ctx: RequestContext = { req, body, apiKeyId };
       return route.handler(ctx);
     }
   }
 
-  return respond(notFound(method, path));
+  return notFound(method, path);
 }
 
 const app = { fetch: dispatch };

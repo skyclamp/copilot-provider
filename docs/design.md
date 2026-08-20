@@ -31,20 +31,6 @@ CAPI 发送 `anthropic-version`。
 当 `stream: true` 时，上游返回 `text/event-stream`。代理 tee 上游
 `ReadableStream`：一支直接返回客户端，另一支旁路解析 usage。
 
-## Session 日志
-
-存在已知 session header 时，代理写入 `logs/<产品缩写>-<session-id>.jsonl`：
-
-- `cc`：Claude Code（`x-claude-code-session-id`）
-- `cx`：Codex（`session-id` / `x-session-id`）
-- `oc`：OpenCode（`x-opencode-session` / `x-session-affinity`）
-- `gb`：Grok Build（`x-grok-session-id`，User-Agent 为 `grok-shell/...`）
-
-每次请求依次记录 `request`、`response_start`、每个 `chunk` 和
-`response_end`，时间戳 `ts` 为 epoch 毫秒。Headers 中的认证信息会脱敏。
-仅当 `LOG_CHUNK_CONTENT=true` 时，`chunk` 记录包含 `content`。
-日志按短时间窗口批量 append，落盘不会阻塞 response EOF。
-
 ## 请求 Headers
 
 每次代理请求组装以下 headers：
