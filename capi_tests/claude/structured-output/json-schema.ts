@@ -18,9 +18,9 @@
  * not supported by CAPI" and the script exits non-zero with the raw payload.
  *
  * Usage:
- *   bun run capi_tests/claude/structured-output/json-schema.ts                 # non-streaming
- *   bun run capi_tests/claude/structured-output/json-schema.ts --stream        # SSE
- *   bun run capi_tests/claude/structured-output/json-schema.ts --model claude-opus-4.7
+ *   node --env-file-if-exists=.env capi_tests/claude/structured-output/json-schema.ts                 # non-streaming
+ *   node --env-file-if-exists=.env capi_tests/claude/structured-output/json-schema.ts --stream        # SSE
+ *   node --env-file-if-exists=.env capi_tests/claude/structured-output/json-schema.ts --model claude-opus-4.7
  *
  * Anthropic docs:
  *   https://platform.claude.com/docs/en/build-with-claude/structured-outputs

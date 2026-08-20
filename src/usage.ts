@@ -3,8 +3,7 @@ import { appendFile, mkdir } from 'node:fs/promises';
 import keys from './keys.json' with { type: 'json' };
 import { requestSessionIdentity } from './session.ts';
 
-const MODULE_DIR = dirname(new URL(import.meta.url).pathname);
-const USAGE_DIR = resolve(MODULE_DIR, '..', 'usage');
+const USAGE_DIR = resolve(process.env.USAGE_DIR || 'usage');
 
 type KeysFile = { claude: string[]; openai: string[] };
 const keysTyped = keys as KeysFile;
@@ -47,7 +46,7 @@ type UsageRecord = {
 
 export async function recordUsage(keyId: string | null | undefined, { model, usage, extras }: UsageRecord): Promise<void> {
   if (!keyId) return;
-  if (Bun.env.DISABLE_USAGE_LOGGING === 'true') return;
+  if (process.env.DISABLE_USAGE_LOGGING === 'true') return;
   const now = new Date();
   const path = usageLogPath(keyId, currentMonth(now));
   const entry = {
@@ -185,7 +184,7 @@ export function pipeAndExtractUsage(
     return new Response(null, { status, headers: respHeaders });
   }
 
-  if (Bun.env.DISABLE_USAGE_LOGGING === 'true') {
+  if (process.env.DISABLE_USAGE_LOGGING === 'true') {
     return new Response(upstream.body, { status, headers: respHeaders });
   }
 

@@ -1,8 +1,8 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
  * GitHub Device Flow OAuth — prints GITHUB_TOKEN for .env
  *
- * Usage: bun run scripts/auth.ts
+ * Usage: npm run auth
  */
 
 import {

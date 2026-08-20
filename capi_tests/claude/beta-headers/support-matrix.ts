@@ -26,10 +26,10 @@
  *   https://github.com/anthropics/anthropic-sdk-typescript (resources/beta/beta.ts)
  *
  * Usage:
- *   bun run capi_tests/claude/beta-headers/support-matrix.ts
- *   bun run capi_tests/claude/beta-headers/support-matrix.ts --model claude-opus-4.8
- *   bun run capi_tests/claude/beta-headers/support-matrix.ts --beta files-api-2025-04-14
- *   bun run capi_tests/claude/beta-headers/support-matrix.ts --verbose
+ *   node --env-file-if-exists=.env capi_tests/claude/beta-headers/support-matrix.ts
+ *   node --env-file-if-exists=.env capi_tests/claude/beta-headers/support-matrix.ts --model claude-opus-4.8
+ *   node --env-file-if-exists=.env capi_tests/claude/beta-headers/support-matrix.ts --beta files-api-2025-04-14
+ *   node --env-file-if-exists=.env capi_tests/claude/beta-headers/support-matrix.ts --verbose
  */
 
 import { callCapiMessages } from '../../_lib/capi.ts';

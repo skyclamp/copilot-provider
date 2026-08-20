@@ -9,7 +9,7 @@ by the scripts in this folder via `capi_tests/_lib/capi.ts`. No proxy involved.
 | Models id sent       | `claude-opus-4.8`, `claude-opus-4.7`, `claude-opus-4.6` |
 | CAPI endpoint        | `https://api.enterprise.githubcopilot.com/v1/messages`  |
 | Account              | GitHub Enterprise Copilot tenant                        |
-| Reproduce            | `bun run capi_tests/claude/structured-output/json-schema.ts [--stream] [--model <id>]` |
+| Reproduce            | `node --env-file-if-exists=.env capi_tests/claude/structured-output/json-schema.ts [--stream] [--model <id>]` |
 
 > Re-run when Copilot, the upstream Anthropic gateway, or the model variant
 > routing changes.

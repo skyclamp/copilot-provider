@@ -11,8 +11,8 @@
  * the upstream feature and the script exits non-zero.
  *
  * Usage:
- *   bun run capi_tests/claude/server-tools/web-fetch.ts            # non-streaming
- *   bun run capi_tests/claude/server-tools/web-fetch.ts --stream   # SSE
+ *   node --env-file-if-exists=.env capi_tests/claude/server-tools/web-fetch.ts            # non-streaming
+ *   node --env-file-if-exists=.env capi_tests/claude/server-tools/web-fetch.ts --stream   # SSE
  *
  * Anthropic docs:
  *   https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-fetch-tool

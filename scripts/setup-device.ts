@@ -1,9 +1,9 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
  * Generate random device IDs for Copilot API headers.
  * Prints env vars to stdout — paste them into your .env file.
  *
- * Usage: bun run scripts/setup-device.ts
+ * Usage: npm run setup-device
  */
 
 import { randomUUID } from 'node:crypto';

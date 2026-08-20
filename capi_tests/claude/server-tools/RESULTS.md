@@ -9,7 +9,7 @@ by the scripts in this folder via `capi_tests/_lib/capi.ts`. No proxy involved.
 | Model id sent        | `claude-opus-4.7`                                       |
 | CAPI endpoint        | `https://api.enterprise.githubcopilot.com/v1/messages`  |
 | Account              | GitHub Enterprise Copilot tenant                        |
-| Reproduce            | `bun run capi_tests/claude/server-tools/support-matrix.ts [--verbose]` |
+| Reproduce            | `node --env-file-if-exists=.env capi_tests/claude/server-tools/support-matrix.ts [--verbose]` |
 
 > Re-run the matrix script when Copilot, the upstream Anthropic gateway, or
 > the model variant routing changes. The `--tool <id>` flag isolates a single
@@ -245,15 +245,15 @@ the first turn, with no preceding text block.
 
 ```sh
 # All eight at once:
-bun run capi_tests/claude/server-tools/support-matrix.ts
+node --env-file-if-exists=.env capi_tests/claude/server-tools/support-matrix.ts
 
 # Single tool with the raw upstream body:
-bun run capi_tests/claude/server-tools/support-matrix.ts \
+node --env-file-if-exists=.env capi_tests/claude/server-tools/support-matrix.ts \
   --tool code_execution_20260120 --verbose
 
 # The per-tool probes for web_search / web_fetch with content-block summaries:
-bun run capi_tests/claude/server-tools/web-search.ts
-bun run capi_tests/claude/server-tools/web-fetch.ts
+node --env-file-if-exists=.env capi_tests/claude/server-tools/web-search.ts
+node --env-file-if-exists=.env capi_tests/claude/server-tools/web-fetch.ts
 ```
 
 ## Caveats

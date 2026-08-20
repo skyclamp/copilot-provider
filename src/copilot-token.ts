@@ -19,8 +19,8 @@ function isTokenValid(token: CopilotTokenResponse | null): token is CopilotToken
 }
 
 function readGitHubToken(): string {
-  const token = Bun.env.GITHUB_TOKEN;
-  if (!token) throw new Error('GITHUB_TOKEN not set in .env. Run: bun run auth');
+  const token = process.env.GITHUB_TOKEN;
+  if (!token) throw new Error('GITHUB_TOKEN not set in .env. Run: npm run auth');
   return token;
 }
 
@@ -30,7 +30,7 @@ async function exchangeToken(githubToken: string): Promise<CopilotTokenResponse>
     headers: {
       Authorization: `token ${githubToken}`,
       'X-GitHub-Api-Version': TOKEN_API_VERSION,
-      'Editor-Device-Id': Bun.env.EDITOR_DEVICE_ID || '',
+      'Editor-Device-Id': process.env.EDITOR_DEVICE_ID || '',
     },
   });
 

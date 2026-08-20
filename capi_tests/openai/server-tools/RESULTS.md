@@ -9,7 +9,7 @@ by the scripts in this folder via `capi_tests/_lib/capi.ts`. No proxy involved.
 | Model id sent | `gpt-5.5`                                               |
 | CAPI endpoint | `https://api.enterprise.githubcopilot.com/responses`    |
 | Account       | GitHub Enterprise Copilot tenant                        |
-| Reproduce     | `bun run capi_tests/openai/server-tools/support-matrix.ts [--verbose]` |
+| Reproduce     | `node --env-file-if-exists=.env capi_tests/openai/server-tools/support-matrix.ts [--verbose]` |
 
 > Re-run the matrix script when Copilot, the upstream OpenAI-compatible
 > gateway, or model routing changes. The `--tool <id>` flag isolates a single

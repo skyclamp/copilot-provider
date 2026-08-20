@@ -10,10 +10,10 @@ type DeviceInfo = {
 };
 
 function getDeviceInfo(): DeviceInfo {
-  const vscodeMachineId = Bun.env.VSCODE_MACHINE_ID;
-  const editorDeviceId = Bun.env.EDITOR_DEVICE_ID;
+  const vscodeMachineId = process.env.VSCODE_MACHINE_ID;
+  const editorDeviceId = process.env.EDITOR_DEVICE_ID;
   if (!vscodeMachineId || !editorDeviceId) {
-    throw new Error('Device env vars not set. Run: bun run setup-device');
+    throw new Error('Device env vars not set. Run: npm run setup-device');
   }
   return { vscodeMachineId, editorDeviceId };
 }
@@ -27,9 +27,9 @@ function buildHeaders(
   device: DeviceInfo,
   agentSessionId: string | undefined,
 ): Record<string, string> {
-  const chatVersion = Bun.env.COPILOT_CHAT_VERSION || '0.41.2';
-  const vscodeVersion = Bun.env.VSCODE_VERSION || '1.113.0';
-  const apiVersion = Bun.env.GITHUB_API_VERSION || '2025-10-01';
+  const chatVersion = process.env.COPILOT_CHAT_VERSION || '0.41.2';
+  const vscodeVersion = process.env.VSCODE_VERSION || '1.113.0';
+  const apiVersion = process.env.GITHUB_API_VERSION || '2025-10-01';
 
   const headers: Record<string, string> = {
     Authorization: `Bearer ${copilotToken}`,

@@ -1,21 +1,21 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 // Aggregate usage JSONL logs under ./usage/ and print per-key statistics.
 //
 // Each log line has shape { ts: <epoch ms>, model: <string|null>, usage: {...} }
 // where `usage` is the raw provider usage payload (Anthropic or OpenAI).
 //
 // Usage:
-//   bun run scripts/usage-stats.ts                   # all keys, all months
-//   bun run scripts/usage-stats.ts --month 2026-04
-//   bun run scripts/usage-stats.ts --key claude-01
-//   bun run scripts/usage-stats.ts --by-model
-//   bun run scripts/usage-stats.ts --json
+//   node --env-file-if-exists=.env scripts/usage-stats.ts                   # all keys, all months
+//   node --env-file-if-exists=.env scripts/usage-stats.ts --month 2026-04
+//   node --env-file-if-exists=.env scripts/usage-stats.ts --key claude-01
+//   node --env-file-if-exists=.env scripts/usage-stats.ts --by-model
+//   node --env-file-if-exists=.env scripts/usage-stats.ts --json
 
 import { readdir, readFile } from 'node:fs/promises';
-import { dirname, resolve, basename } from 'node:path';
+import { resolve, basename } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
-const MODULE_DIR = dirname(new URL(import.meta.url).pathname);
-const USAGE_DIR = resolve(MODULE_DIR, '..', 'usage');
+const USAGE_DIR = resolve(process.env.USAGE_DIR || 'usage');
 
 type Args = { month: string | null; key: string | null; json: boolean; byModel: boolean };
 
@@ -28,7 +28,7 @@ function parseArgs(argv: string[]): Args {
     else if (a === '--json') args.json = true;
     else if (a === '--by-model') args.byModel = true;
     else if (a === '-h' || a === '--help') {
-      console.log('Usage: bun run scripts/usage-stats.ts [--month YYYY-MM] [--key <id>] [--by-model] [--json]');
+      console.log('Usage: node --env-file-if-exists=.env scripts/usage-stats.ts [--month YYYY-MM] [--key <id>] [--by-model] [--json]');
       process.exit(0);
     } else {
       console.error(`Unknown argument: ${a}`);
@@ -419,7 +419,7 @@ async function main(): Promise<void> {
   }
 }
 
-if (import.meta.main) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((err) => {
     console.error(err);
     process.exit(1);

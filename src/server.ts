@@ -26,7 +26,7 @@ function resolveProvidedKey(rawKey: string | null | undefined): { ok: true; keyI
 type AuthScheme = 'x-api-key' | 'bearer';
 
 function getApiKeyId(req: Request, scheme: AuthScheme): string | null {
-  if (Bun.env.DISABLE_INPUT_AUTH === 'true') return 'noauth';
+  if (process.env.DISABLE_INPUT_AUTH === 'true') return 'noauth';
   let raw: string | null;
   if (scheme === 'x-api-key') {
     raw = req.headers.get('x-api-key');
@@ -39,11 +39,11 @@ function getApiKeyId(req: Request, scheme: AuthScheme): string | null {
 }
 
 class RequestBodyError extends Error {
-  constructor(
-    message: string,
-    readonly status: 400 | 415,
-  ) {
+  readonly status: 400 | 415;
+
+  constructor(message: string, status: 400 | 415) {
     super(message);
+    this.status = status;
   }
 }
 

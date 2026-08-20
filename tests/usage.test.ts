@@ -1,25 +1,28 @@
-import { describe, expect, test } from 'bun:test';
+import assert from 'node:assert/strict';
+import { describe, test } from 'node:test';
 import { SSEUsageParser } from '../src/usage.ts';
 
 describe('SSEUsageParser', () => {
-  test.each(['\n', '\r\n', '\r'])('parses %j line endings', newline => {
-    const parser = new SSEUsageParser();
-    parser.feed([
-      'event: message_start',
-      'data: {"message":{"model":"claude-sonnet-5","usage":{"input_tokens":10}}}',
-      '',
-      'event: message_delta',
-      'data: {"usage":{"output_tokens":3}}',
-      '',
-      '',
-    ].join(newline));
-    parser.finish();
+  for (const newline of ['\n', '\r\n', '\r']) {
+    test(`parses ${JSON.stringify(newline)} line endings`, () => {
+      const parser = new SSEUsageParser();
+      parser.feed([
+        'event: message_start',
+        'data: {"message":{"model":"claude-sonnet-5","usage":{"input_tokens":10}}}',
+        '',
+        'event: message_delta',
+        'data: {"usage":{"output_tokens":3}}',
+        '',
+        '',
+      ].join(newline));
+      parser.finish();
 
-    expect(parser.result()).toEqual({
-      model: 'claude-sonnet-5',
-      usage: { input_tokens: 10, output_tokens: 3 },
+      assert.deepEqual(parser.result(), {
+        model: 'claude-sonnet-5',
+        usage: { input_tokens: 10, output_tokens: 3 },
+      });
     });
-  });
+  }
 
   test('handles boundaries split across chunks and the final unterminated event', () => {
     const parser = new SSEUsageParser();
@@ -29,7 +32,7 @@ describe('SSEUsageParser', () => {
     parser.feed('{"usage":{"input_tokens":7,"output_tokens":2}}}');
     parser.finish();
 
-    expect(parser.result()).toEqual({
+    assert.deepEqual(parser.result(), {
       model: 'gpt-5.5',
       usage: { input_tokens: 7, output_tokens: 2 },
     });
@@ -41,7 +44,7 @@ describe('SSEUsageParser', () => {
     parser.feed('data: "model":"gpt-5.5","usage":{"completion_tokens":4}}\n\n');
     parser.finish();
 
-    expect(parser.result()).toEqual({
+    assert.deepEqual(parser.result(), {
       model: 'gpt-5.5',
       usage: { completion_tokens: 4 },
     });
