@@ -31,18 +31,3 @@ export function getGitHubAccessTokenUrl(): string {
 
 export const DEFAULT_COPILOT_API_BASE_URL = 'https://api.githubcopilot.com';
 export const TOKEN_API_VERSION = '2025-04-01';
-
-export const MODEL_ALIASES: Record<string, string> = {
-  'claude-haiku-4-5': 'claude-haiku-4.5',
-  'claude-haiku-4-5-20251001': 'claude-haiku-4.5',
-  'claude-sonnet-4-6': 'claude-sonnet-4.6',
-  'claude-opus-4-6': 'claude-opus-4.6',
-  'claude-opus-4-7': 'claude-opus-4.7',
-  'claude-opus-4-8': 'claude-opus-4.8',
-  'claude-opus-5': 'claude-opus-5',
-  'haiku': 'claude-haiku-4.5',
-  'sonnet': 'claude-sonnet-5',
-  'sonnet[1m]': 'claude-sonnet-5',
-  'opus': 'claude-opus-5',
-  'opus[1m]': 'claude-opus-5',
-};

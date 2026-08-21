@@ -2,15 +2,17 @@
 
 A small Bun/TypeScript proxy for GitHub Copilot CAPI.
 
-It exposes three endpoints:
+It exposes these endpoints:
 
+- `HEAD /`
+- `HEAD /api/hello`
 - `POST /v1/messages`
-- `POST /v1/responses`
-- `POST /v1/chat/completions`
+- `POST /responses`
+- `POST /chat/completions`
 
-Requests must contain a JSON object. The proxy adds the CAPI authentication and
-device headers, forwards response bodies, and extracts usage from a tee'd
-response stream.
+Request bodies are passed through without being read or validated. The proxy
+adds the CAPI authentication and device headers, forwards response bodies, and
+extracts usage from a tee'd response stream.
 
 ```sh
 bun run setup-device

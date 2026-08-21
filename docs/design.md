@@ -2,8 +2,8 @@
 
 ## 透传原则
 
-三个端点仅接受 JSON object。Request body 保持语义不变，仅 `/v1/messages`
-做必要的 model 别名映射。CAPI 默认返回 usage，代理不添加 usage 请求字段。
+三个 POST 端点不读取、不校验或修改 Request body，直接透传至 CAPI。CAPI 默认
+返回 usage，代理不添加 usage 请求字段。
 
 上游状态码和 response body 原样转发；代理自身故障返回 502。
 
@@ -12,19 +12,17 @@
 | 代理端点 | 上游路径 |
 |----------|----------|
 | `POST /v1/messages` | `{api}/v1/messages` |
-| `POST /v1/responses` | `{api}/responses` |
-| `POST /v1/chat/completions` | `{api}/chat/completions` |
+| `POST /responses` | `{api}/responses` |
+| `POST /chat/completions` | `{api}/chat/completions` |
+| `HEAD /` | `200` |
+| `HEAD /api/hello` | `200` |
 
-`/v1/responses` 和 `/v1/chat/completions` 的上游路径无 `/v1` 前缀。
+`/responses` 和 `/chat/completions` 的上游路径无 `/v1` 前缀。
 
 其他所有请求 → 404。
 
-## Model 别名
-
-仅 `/v1/messages` 做 model 名称映射（`MODEL_ALIASES`），其余端点原样透传 model。
-
-`/v1/messages` 将 `anthropic-beta` header 原值透传，不做白名单过滤；不向
-CAPI 发送 `anthropic-version`。
+`/v1/messages` 将 `anthropic-beta` header 原值透传，不向 CAPI 发送
+`anthropic-version`。
 
 ## 流式转发
 

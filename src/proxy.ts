@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import { getCopilotToken, getCopilotApiBaseUrl } from './copilot-token.ts';
-import { MODEL_ALIASES } from './constants.ts';
 import { requestSessionIdentity } from './session.ts';
 import type { ProxyContext } from './types.ts';
 
@@ -45,14 +44,6 @@ function buildHeaders(
     headers['VScode-SessionId'] = agentSessionId;
   }
   return headers;
-}
-
-export function mapModel(model: string): string {
-  return MODEL_ALIASES[model] || model;
-}
-
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export async function getProxyContext(req?: Request): Promise<ProxyContext> {

@@ -5,7 +5,7 @@ import { getCopilotToken } from '../src/copilot-token.ts';
 type CapturedCall = {
   url: string;
   headers: Headers;
-  body: Record<string, unknown>;
+  body: string;
 };
 
 const originalFetch = globalThis.fetch;
@@ -48,7 +48,7 @@ beforeAll(() => {
     calls.push({
       url,
       headers: new Headers(init.headers),
-      body: JSON.parse(String(init.body)) as Record<string, unknown>,
+      body: await new Response(init.body ?? null).text(),
     });
     return Response.json({ model: 'upstream-model', usage: { input_tokens: 1 } }, {
       headers: { 'x-request-id': 'upstream-request-id' },
@@ -92,13 +92,13 @@ describe('proxy request contract', () => {
         body: { model: 'sonnet', messages: [], metadata: { trace: true } },
       },
       {
-        path: '/v1/responses',
+        path: '/responses',
         upstream: 'https://capi.test/responses',
         headers: { 'content-type': 'application/json' },
         body: { model: 'gpt-5.5', input: 'ping' },
       },
       {
-        path: '/v1/chat/completions',
+        path: '/chat/completions',
         upstream: 'https://capi.test/chat/completions',
         headers: { 'content-type': 'application/json' },
         body: { model: 'gpt-5.5', messages: [] },
@@ -115,30 +115,39 @@ describe('proxy request contract', () => {
     for (const [index, call] of calls.entries()) {
       expect(call.url).toBe(cases[index]?.upstream);
       expect(call.headers.get('content-type')).toBe('application/json');
-      expect(call.body).toEqual({
-        ...cases[index]?.body,
-        ...(index === 0 ? { model: 'claude-sonnet-5' } : {}),
-      });
+      expect(call.body).toBe(JSON.stringify(cases[index]?.body));
     }
     expect(calls[0]?.headers.get('anthropic-beta')).toBe('context-1m-2025-08-07');
     expect(calls[0]?.headers.has('anthropic-version')).toBe(false);
   });
 
-  test('rejects unsupported or non-object request bodies', async () => {
+  test('serves health checks and does not expose legacy v1 routes', async () => {
     const before = calls.length;
-    const invalid = await request('/v1/responses', '{', { 'content-type': 'application/json' });
-    const array = await request('/v1/responses', '[]', { 'content-type': 'application/json' });
-    const text = await request('/v1/responses', '{}', { 'content-type': 'text/plain' });
+    for (const path of ['/', '/api/hello']) {
+      const response = await app.fetch(new Request(`http://localhost${path}`, { method: 'HEAD' }));
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe('');
+    }
 
-    expect(invalid.status).toBe(400);
-    expect(array.status).toBe(400);
-    expect(text.status).toBe(415);
+    const legacy = await request('/v1/responses', '{}');
+    expect(legacy.status).toBe(404);
     expect(calls).toHaveLength(before);
   });
 
-  test('accepts structured JSON media types and no longer exposes embeddings', async () => {
-    const response = await request('/v1/responses', '{"model":"gpt-5.5"}', {
-      'content-type': 'application/problem+json',
+  test('passes request bodies through without validation', async () => {
+    const before = calls.length;
+    const invalid = await request('/responses', '{', { 'content-type': 'text/plain' });
+    const array = await request('/responses', '[]');
+
+    expect(invalid.status).toBe(200);
+    expect(array.status).toBe(200);
+    expect(calls).toHaveLength(before + 2);
+    expect(calls.slice(before).map(call => call.body)).toEqual(['{', '[]']);
+  });
+
+  test('does not expose embeddings', async () => {
+    const response = await request('/responses', '{"model":"gpt-5.5"}', {
+      'content-type': 'text/plain',
     });
     expect(response.status).toBe(200);
     await response.text();

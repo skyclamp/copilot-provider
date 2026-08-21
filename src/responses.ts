@@ -1,4 +1,4 @@
-import { buildResponseHeaders, getProxyContext, isRecord } from './proxy.ts';
+import { buildResponseHeaders, getProxyContext } from './proxy.ts';
 import { pipeAndExtractUsage, requestUsageExtras } from './usage.ts';
 import type { RequestContext } from './types.ts';
 
@@ -6,21 +6,16 @@ export async function proxyResponses(ctx: RequestContext): Promise<Response> {
   try {
     const { req, apiKeyId } = ctx;
     const { apiBase, headers } = await getProxyContext(req);
-    const body = { ...ctx.body };
 
     const accept = req.headers.get('accept');
     if (accept) headers.Accept = accept;
 
-    const reasoning = isRecord(body.reasoning) ? body.reasoning : null;
-    const effort = typeof reasoning?.effort === 'string' ? reasoning.effort : 'none';
-    console.log(
-      `[proxy] responses model=${String(body.model)} stream=${Boolean(body.stream)} effort=${effort} key=${apiKeyId}`,
-    );
+    console.log(`[proxy] responses key=${apiKeyId}`);
 
     const upstream = await fetch(`${apiBase}/responses`, {
       method: 'POST',
       headers,
-      body: JSON.stringify(body),
+      body: req.body,
     });
 
     const respHeaders = buildResponseHeaders(upstream);
@@ -35,8 +30,8 @@ export async function proxyResponses(ctx: RequestContext): Promise<Response> {
       return pipeAndExtractUsage(upstream, respHeaders, {
         endpoint: 'responses',
         keyId: apiKeyId,
-        stream: Boolean(body.stream),
-        requestModel: typeof body.model === 'string' ? body.model : null,
+        stream: false,
+        requestModel: null,
         extras: requestUsageExtras(req),
       });
     }

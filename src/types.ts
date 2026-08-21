@@ -1,6 +1,5 @@
 export type RequestContext = {
   req: Request;
-  body: Record<string, unknown>;
   apiKeyId: string;
 };
 

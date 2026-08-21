@@ -38,48 +38,10 @@ function getApiKeyId(req: Request, scheme: AuthScheme): string | null {
   return result.ok ? result.keyId : null;
 }
 
-class RequestBodyError extends Error {
-  constructor(
-    message: string,
-    readonly status: 400 | 415,
-  ) {
-    super(message);
-  }
-}
-
-function isJsonContentType(contentType: string): boolean {
-  const mediaType = contentType.split(';', 1)[0]?.trim().toLowerCase() ?? '';
-  return mediaType === 'application/json' || mediaType.endsWith('+json');
-}
-
-function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-async function readJsonObject(req: Request): Promise<Record<string, unknown>> {
-  const contentType = req.headers.get('content-type') ?? '';
-  if (!isJsonContentType(contentType)) {
-    throw new RequestBodyError('content-type must be application/json', 415);
-  }
-  const text = await req.text();
-  if (!text) throw new RequestBodyError('request body must be a JSON object', 400);
-
-  let value: unknown;
-  try {
-    value = JSON.parse(text);
-  } catch {
-    throw new RequestBodyError('invalid json', 400);
-  }
-  if (!isJsonObject(value)) {
-    throw new RequestBodyError('request body must be a JSON object', 400);
-  }
-  return value;
-}
-
 const ROUTES: Record<string, { handler: EndpointHandler; scheme: AuthScheme; authLabel: string }> = {
   '/v1/messages': { handler: proxyMessages, scheme: 'x-api-key', authLabel: 'api key' },
-  '/v1/responses': { handler: proxyResponses, scheme: 'bearer', authLabel: 'authorization' },
-  '/v1/chat/completions': { handler: proxyChatCompletions, scheme: 'bearer', authLabel: 'authorization' },
+  '/responses': { handler: proxyResponses, scheme: 'bearer', authLabel: 'authorization' },
+  '/chat/completions': { handler: proxyChatCompletions, scheme: 'bearer', authLabel: 'authorization' },
 };
 
 async function dispatch(req: Request): Promise<Response> {
@@ -87,7 +49,7 @@ async function dispatch(req: Request): Promise<Response> {
   const path = url.pathname;
   const method = req.method;
 
-  if (method === 'HEAD' && path === '/') {
+  if (method === 'HEAD' && (path === '/' || path === '/api/hello')) {
     return new Response(null, { status: 200 });
   }
 
@@ -99,20 +61,7 @@ async function dispatch(req: Request): Promise<Response> {
         return rejectUnauthorized(method, path, route.authLabel);
       }
 
-      let body: Record<string, unknown>;
-      try {
-        body = await readJsonObject(req);
-      } catch (error) {
-        const bodyError = error instanceof RequestBodyError
-          ? error
-          : new RequestBodyError('invalid json', 400);
-        return new Response(JSON.stringify({ error: bodyError.message }), {
-          status: bodyError.status,
-          headers: JSON_HEADERS,
-        });
-      }
-
-      const ctx: RequestContext = { req, body, apiKeyId };
+      const ctx: RequestContext = { req, apiKeyId };
       return route.handler(ctx);
     }
   }

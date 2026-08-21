@@ -6,19 +6,16 @@ export async function proxyChatCompletions(ctx: RequestContext): Promise<Respons
   try {
     const { req, apiKeyId } = ctx;
     const { apiBase, headers } = await getProxyContext(req);
-    const body = { ...ctx.body };
 
     const accept = req.headers.get('accept');
     if (accept) headers.Accept = accept;
 
-    console.log(
-      `[proxy] chat/completions model=${String(body.model)} stream=${Boolean(body.stream)} key=${apiKeyId}`,
-    );
+    console.log(`[proxy] chat/completions key=${apiKeyId}`);
 
     const upstream = await fetch(`${apiBase}/chat/completions`, {
       method: 'POST',
       headers,
-      body: JSON.stringify(body),
+      body: req.body,
     });
 
     const respHeaders = buildResponseHeaders(upstream);
@@ -33,8 +30,8 @@ export async function proxyChatCompletions(ctx: RequestContext): Promise<Respons
       return pipeAndExtractUsage(upstream, respHeaders, {
         endpoint: 'chat/completions',
         keyId: apiKeyId,
-        stream: Boolean(body.stream),
-        requestModel: typeof body.model === 'string' ? body.model : null,
+        stream: false,
+        requestModel: null,
         extras: requestUsageExtras(req),
       });
     }
