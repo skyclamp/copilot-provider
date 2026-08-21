@@ -29,13 +29,13 @@ function tokenIsValid(token: CopilotTokenResponse | null): token is CopilotToken
 }
 
 function requireEnv(name: string): string {
-  const value = process.env[name];
+  const value = Bun.env[name];
   if (!value) throw new Error(`Required env var ${name} is not set (loaded from .env)`);
   return value;
 }
 
 function gheHost(): string | null {
-  const raw = process.env.GHE_HOST?.replace(/^https?:\/\//, '').replace(/\/+$/, '').trim();
+  const raw = Bun.env.GHE_HOST?.replace(/^https?:\/\//, '').replace(/\/+$/, '').trim();
   return raw ? raw : null;
 }
 
@@ -48,7 +48,7 @@ export async function getCopilotToken(): Promise<CopilotTokenResponse> {
   if (tokenIsValid(cachedToken)) return cachedToken;
 
   const githubToken = requireEnv('GITHUB_TOKEN');
-  const editorDeviceId = process.env.EDITOR_DEVICE_ID ?? '';
+  const editorDeviceId = Bun.env.EDITOR_DEVICE_ID ?? '';
 
   const resp = await fetch(`${githubApiBase()}${GITHUB_COPILOT_TOKEN_PATH}`, {
     method: 'GET',
@@ -73,9 +73,9 @@ export function getCopilotApiBase(tokenResp: CopilotTokenResponse): string {
 }
 
 function buildCapiHeaders(copilotToken: string): Record<string, string> {
-  const chatVersion = process.env.COPILOT_CHAT_VERSION || '0.50.0';
-  const vscodeVersion = process.env.VSCODE_VERSION || '1.122.0';
-  const apiVersion = process.env.GITHUB_API_VERSION || '2026-06-01';
+  const chatVersion = Bun.env.COPILOT_CHAT_VERSION || '0.50.0';
+  const vscodeVersion = Bun.env.VSCODE_VERSION || '1.122.0';
+  const apiVersion = Bun.env.GITHUB_API_VERSION || '2026-06-01';
   const machineId = requireEnv('VSCODE_MACHINE_ID');
   const deviceId = requireEnv('EDITOR_DEVICE_ID');
 

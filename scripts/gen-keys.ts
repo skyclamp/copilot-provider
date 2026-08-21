@@ -1,17 +1,17 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 // Generate src/keys.json with random API keys.
 //
 // Usage:
-//   node --env-file-if-exists=.env scripts/gen-keys.ts                     # 5 claude + 5 openai (defaults)
-//   node --env-file-if-exists=.env scripts/gen-keys.ts --claude 10
-//   node --env-file-if-exists=.env scripts/gen-keys.ts --openai 3
-//   node --env-file-if-exists=.env scripts/gen-keys.ts --claude 8 --openai 8
+//   bun run scripts/gen-keys.ts                     # 5 claude + 5 openai (defaults)
+//   bun run scripts/gen-keys.ts --claude 10
+//   bun run scripts/gen-keys.ts --openai 3
+//   bun run scripts/gen-keys.ts --claude 8 --openai 8
 
 import { randomBytes } from 'node:crypto';
-import { resolve } from 'node:path';
-import { writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 
-const OUT = resolve('src', 'keys.json');
+const MODULE_DIR = dirname(new URL(import.meta.url).pathname);
+const OUT = resolve(MODULE_DIR, '..', 'src', 'keys.json');
 
 type Args = { claude: number; openai: number };
 
@@ -22,7 +22,7 @@ function parseArgs(argv: string[]): Args {
     if (a === '--claude') args.claude = parseInt(argv[++i], 10);
     else if (a === '--openai') args.openai = parseInt(argv[++i], 10);
     else if (a === '-h' || a === '--help') {
-      console.log('Usage: npm run gen-keys -- [--claude N] [--openai N]');
+      console.log('Usage: bun run scripts/gen-keys.ts [--claude N] [--openai N]');
       process.exit(0);
     } else {
       console.error(`Unknown argument: ${a}`);
@@ -53,5 +53,5 @@ const keys = {
   openai: Array.from({ length: args.openai }, genOpenAIKey),
 };
 
-await writeFile(OUT, JSON.stringify(keys, null, 2) + '\n');
+await Bun.write(OUT, JSON.stringify(keys, null, 2) + '\n');
 console.log(`Generated ${args.claude} claude + ${args.openai} openai keys → src/keys.json`);

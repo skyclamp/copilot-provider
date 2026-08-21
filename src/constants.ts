@@ -11,7 +11,7 @@ function normalizeGheHost(host: string | undefined | null): string | null {
 }
 
 export function getGheHost(): string | null {
-  return normalizeGheHost(process.env.GHE_HOST);
+  return normalizeGheHost(Bun.env.GHE_HOST);
 }
 
 export function getGitHubApiBaseUrl(): string {

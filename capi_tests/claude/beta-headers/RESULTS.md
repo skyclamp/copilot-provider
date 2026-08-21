@@ -11,7 +11,7 @@ these results — this is CAPI's own beta gate.
 | Models          | `claude-opus-4.8`, `claude-opus-4.7`, `claude-opus-4.6`, `claude-sonnet-4.6`, `claude-haiku-4.5` |
 | CAPI endpoint   | `https://api.enterprise.githubcopilot.com/v1/messages`                |
 | Account         | GitHub Enterprise Copilot tenant                                      |
-| Reproduce       | `node --env-file-if-exists=.env capi_tests/claude/beta-headers/support-matrix.ts [--model <id>] [--beta <name>] [--verbose]` |
+| Reproduce       | `bun run capi_tests/claude/beta-headers/support-matrix.ts [--model <id>] [--beta <name>] [--verbose]` |
 
 Each cell is a minimal `max_tokens=1` "ping" carrying a single `anthropic-beta`
 header. `ok` = HTTP 200 (header accepted), `no` = 4xx whose message references a

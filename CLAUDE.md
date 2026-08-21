@@ -1,42 +1,44 @@
 # copilot-provider — agent guide
 
 A thin proxy that exposes GitHub Copilot's chat backend behind Anthropic /
-OpenAI compatible endpoints. **Node.js + TypeScript**, compiled to `dist/` for production.
+OpenAI compatible endpoints. **Bun + TypeScript**, no transpilation step.
 
 ## Runtime
 
-- **Node.js >= 24** (see `engines` in [package.json](package.json)). The HTTP
-  server uses `node:http`; there are no runtime dependencies.
-- Production runs compiled JavaScript from `dist/index.js`. Node's built-in
-  type stripping is used for development scripts and tests.
+- **Bun >= 1.1** (see `engines` in [package.json](package.json)). The
+  project uses `Bun.serve`, `Bun.env`, `Bun.write`, and `Bun.file` —
+  Node-only APIs (`http`, `express`) are not used.
+- TypeScript sources executed directly by Bun (`bun run index.ts`); no
+  build step.
 - ES modules (`"type": "module"`); use `import` / `export`. Keep `.ts`
   extensions in import specifiers — `tsconfig.json` has
   `allowImportingTsExtensions: true`.
-- npm scripts that need configuration load `.env` with Node's
-  `--env-file-if-exists` flag; do not add `dotenv`.
-- Dependencies are intentionally minimal: only `@types/node` and
-  `typescript` as devDependencies. Prefer `node:` built-ins over adding packages.
+- Bun auto-loads `.env` at startup; do not call `dotenv` or load `.env`
+  manually.
+- Dependencies are intentionally minimal: only `@types/bun` and
+  `typescript` as devDependencies — no runtime deps. Prefer Bun built-ins
+  (`Bun.serve`, `Bun.file`, `Bun.write`, `Bun.env`) and `node:` built-ins
+  (`node:fs/promises`, `node:crypto`, `node:path`) over adding packages.
 
 ## Common commands
 
 ```sh
-npm run build                    # compile TypeScript to dist/
-npm start                        # run dist/index.js on $PORT (default 4141)
-npm run dev                      # run source in watch mode
-npm run auth                     # GitHub device-flow login → prints GITHUB_TOKEN for .env
-npm run setup-device             # generates VSCODE_*/EDITOR_DEVICE_ID for .env
-npm run gen-keys                 # mints input API keys into src/keys.json
-npm run fetch-models -- --token <gh-token>   # prints the upstream Copilot /models payload (debug only)
-npm run usage-stats              # summarises usage/*.jsonl
-npm test                         # automated contract and parser tests
-npm run typecheck                # tsc --noEmit
+bun run start                    # or: bun run index.ts — start the proxy on $PORT (default 4141)
+bun run dev                      # watch mode
+bun run auth                     # GitHub device-flow login → prints GITHUB_TOKEN for .env
+bun run setup-device             # generates VSCODE_*/EDITOR_DEVICE_ID for .env
+bun run gen-keys                 # mints input API keys into src/keys.json
+bun run fetch-models -- --token <gh-token>   # prints the upstream Copilot /models payload (debug only)
+bun run usage-stats              # summarises usage/*.jsonl
+bun test                         # automated contract and parser tests
+bun run typecheck                # tsc --noEmit
 ```
 
-Tests use Node's built-in test runner. No linter is configured.
+Tests use Bun's built-in test runner. No linter is configured.
 
 ## Architecture
 
-Entry point [index.ts](index.ts) adapts `node:http` requests to the `fetch`
+Entry point [index.ts](index.ts) calls `Bun.serve` with the `fetch`
 handler exported by [src/server.ts](src/server.ts). The server only
 exposes:
 
@@ -115,15 +117,15 @@ Two-sided:
 See [.env.example](.env.example). Required for normal operation:
 
 - `GITHUB_TOKEN`, `VSCODE_MACHINE_ID`,
-  `EDITOR_DEVICE_ID` — populated by `npm run auth` + `npm run setup-device`.
+  `EDITOR_DEVICE_ID` — populated by `bun run auth` + `bun run setup-device`.
 - `COPILOT_CHAT_VERSION`, `VSCODE_VERSION`, `GITHUB_API_VERSION` — sent in
   upstream headers; bump these to track real Copilot Chat releases.
 - `PORT` (default `4141`).
 
 Optional settings: `DISABLE_INPUT_AUTH`, `DISABLE_USAGE_LOGGING`, `GHE_HOST`.
-`MODELS_API_VERSION` is only read by the `npm run fetch-models` debug script.
+`MODELS_API_VERSION` is only read by the `bun run fetch-models` debug script.
 
-Read env vars via `process.env.X`.
+Read env vars via `Bun.env.X` (preferred) or `process.env.X`; both work.
 
 ## Conventions
 
@@ -134,6 +136,8 @@ Read env vars via `process.env.X`.
   meant to stay tiny.
 - Logging: one-line `[proxy]` / `[server]` / `[usage]` prefixed lines via
   `console.log` / `console.error`. No logger library.
-- File I/O: use `node:fs/promises`.
+- File I/O: prefer `Bun.file()` / `Bun.write()` for one-shot reads/writes;
+  `node:fs/promises` for `appendFile` and `mkdir` (where Bun has no
+  matching helper).
 - Types: handlers return `Promise<Response>` and take a `RequestContext`
   (`{ req, body, apiKeyId }`) defined in `src/types.ts`.

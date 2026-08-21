@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Standalone Copilot models fetcher.
  *
@@ -7,7 +7,7 @@
  * printed for debugging with --include-token-response.
  *
  * Usage:
- *   node --env-file-if-exists=.env scripts/fetch-models.ts --token <github-token> [OPTIONS]
+ *   bun run scripts/fetch-models.ts --token <github-token> [OPTIONS]
  */
 
 import { randomUUID } from 'node:crypto';
@@ -19,7 +19,7 @@ import {
   DEFAULT_COPILOT_API_BASE_URL,
 } from '../src/constants.ts';
 
-const MODELS_API_VERSION = process.env.MODELS_API_VERSION || '2026-06-01';
+const MODELS_API_VERSION = Bun.env.MODELS_API_VERSION || '2026-06-01';
 
 type Args = {
   token: string | null;
@@ -31,9 +31,9 @@ type Args = {
 
 function parseArgs(argv: string[]): Args {
   const args: Args = {
-    token: process.env.GITHUB_TOKEN || null,
-    gheHost: process.env.GHE_HOST
-      ? process.env.GHE_HOST.replace(/^https?:\/\//, '').replace(/\/+$/, '')
+    token: Bun.env.GITHUB_TOKEN || null,
+    gheHost: Bun.env.GHE_HOST
+      ? Bun.env.GHE_HOST.replace(/^https?:\/\//, '').replace(/\/+$/, '')
       : null,
     copilotApiBaseUrl: null,
     includeTokenResponse: false,
@@ -62,7 +62,7 @@ function parseArgs(argv: string[]): Args {
 
 function printHelp(): void {
   console.log([
-    'Usage: node --env-file-if-exists=.env scripts/fetch-models.ts --token <github-token> [OPTIONS]',
+    'Usage: bun run scripts/fetch-models.ts --token <github-token> [OPTIONS]',
     '',
     'Exchanges a GitHub access token for a Copilot token, then calls the',
     'Copilot /models endpoint and prints its response as JSON.',
@@ -85,8 +85,8 @@ function getGitHubApiBaseUrl(gheHost: string | null): string {
 }
 
 function getEditorVersions(): { editorVersion: string; editorPluginVersion: string } {
-  const chatVersion = process.env.COPILOT_CHAT_VERSION || '0.41.2';
-  const vscodeVersion = process.env.VSCODE_VERSION || '1.113.0';
+  const chatVersion = Bun.env.COPILOT_CHAT_VERSION || '0.41.2';
+  const vscodeVersion = Bun.env.VSCODE_VERSION || '1.113.0';
   return {
     editorVersion: `vscode/${vscodeVersion}`,
     editorPluginVersion: `copilot-chat/${chatVersion}`,
@@ -97,7 +97,7 @@ function tokenExchangeHeaders(githubToken: string): Record<string, string> {
   return {
     Authorization: `token ${githubToken}`,
     'X-GitHub-Api-Version': TOKEN_API_VERSION,
-    'Editor-Device-Id': process.env.EDITOR_DEVICE_ID || '',
+    'Editor-Device-Id': Bun.env.EDITOR_DEVICE_ID || '',
   };
 }
 

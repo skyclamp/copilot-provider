@@ -7,10 +7,10 @@
  * response emitted the expected Responses output item.
  *
  * Usage:
- *   node --env-file-if-exists=.env capi_tests/openai/server-tools/support-matrix.ts
- *   node --env-file-if-exists=.env capi_tests/openai/server-tools/support-matrix.ts --model gpt-5.4
- *   node --env-file-if-exists=.env capi_tests/openai/server-tools/support-matrix.ts --tool web_search
- *   node --env-file-if-exists=.env capi_tests/openai/server-tools/support-matrix.ts --verbose
+ *   bun run capi_tests/openai/server-tools/support-matrix.ts
+ *   bun run capi_tests/openai/server-tools/support-matrix.ts --model gpt-5.4
+ *   bun run capi_tests/openai/server-tools/support-matrix.ts --tool web_search
+ *   bun run capi_tests/openai/server-tools/support-matrix.ts --verbose
  */
 
 import { callCapiResponses } from '../../_lib/capi.ts';
@@ -151,8 +151,8 @@ function classifySuccess(probe: ToolProbe, body: string): { verdict: Verdict; no
 }
 
 function buildProbes(): ToolProbe[] {
-  const vectorStoreId = process.env.CAPI_FILE_SEARCH_VECTOR_STORE_ID || DEFAULT_FILE_SEARCH_VECTOR_STORE_ID;
-  const mcpServerUrl = process.env.CAPI_MCP_SERVER_URL || DEFAULT_MCP_SERVER_URL;
+  const vectorStoreId = Bun.env.CAPI_FILE_SEARCH_VECTOR_STORE_ID || DEFAULT_FILE_SEARCH_VECTOR_STORE_ID;
+  const mcpServerUrl = Bun.env.CAPI_MCP_SERVER_URL || DEFAULT_MCP_SERVER_URL;
 
   return [
     {

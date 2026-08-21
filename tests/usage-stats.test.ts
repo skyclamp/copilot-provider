@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { expect, test } from 'bun:test';
 import {
   computeClaudeEntryCost,
   computeGrokEntryCost,
@@ -20,7 +19,7 @@ test('computes Claude cache write and read pricing without double counting', () 
       cache_read_input_tokens: 100_000,
     },
   });
-  assert.ok(Math.abs(cost - 19.38) < 1e-8);
+  expect(cost).toBeCloseTo(19.38, 8);
 });
 
 test('computes OpenAI cached input and long-context pricing', () => {
@@ -40,8 +39,8 @@ test('computes OpenAI cached input and long-context pricing', () => {
       output_tokens: 10_000,
     },
   });
-  assert.ok(Math.abs(short - 0.355) < 1e-8);
-  assert.ok(Math.abs(long - 1.495005) < 1e-8);
+  expect(short).toBeCloseTo(0.355, 8);
+  expect(long).toBeCloseTo(1.495005, 8);
 });
 
 test('uses xAI long-context pricing at the inclusive boundary', () => {
@@ -53,5 +52,5 @@ test('uses xAI long-context pricing at the inclusive boundary', () => {
       output_tokens: 10_000,
     },
   });
-  assert.ok(Math.abs(cost - 0.86) < 1e-8);
+  expect(cost).toBeCloseTo(0.86, 8);
 });

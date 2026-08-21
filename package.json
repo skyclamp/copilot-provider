@@ -1,24 +1,24 @@
 {
   "name": "copilot-provider",
-  "main": "dist/index.js",
+  "main": "index.ts",
   "devDependencies": {
-    "@types/node": "^24.0.0",
-    "typescript": "^5.9.0"
+    "@types/bun": "latest",
+    "typescript": "^5.5.0"
   },
   "engines": {
-    "node": ">=24.0.0"
+    "bun": ">=1.1.0"
   },
   "private": true,
   "scripts": {
-    "start": "node --env-file-if-exists=.env dist/index.js",
-    "build": "tsc",
-    "dev": "node --env-file-if-exists=.env --watch index.ts",
-    "auth": "node --env-file-if-exists=.env scripts/auth.ts",
-    "setup-device": "node scripts/setup-device.ts",
-    "gen-keys": "node scripts/gen-keys.ts",
-    "fetch-models": "node --env-file-if-exists=.env scripts/fetch-models.ts",
-    "usage-stats": "node scripts/usage-stats.ts",
-    "test": "node --test tests/*.test.ts",
+    "start": "bun run index.ts",
+    "build": "bun build index.ts --target=bun --outfile=dist/copilot-provider.js",
+    "dev": "bun --watch run index.ts",
+    "auth": "bun run scripts/auth.ts",
+    "setup-device": "bun run scripts/setup-device.ts",
+    "gen-keys": "bun run scripts/gen-keys.ts",
+    "fetch-models": "bun run scripts/fetch-models.ts",
+    "usage-stats": "bun run scripts/usage-stats.ts",
+    "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
   "type": "module"

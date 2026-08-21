@@ -13,9 +13,9 @@
 > model-family feature (server tools, structured output, reasoning effort, …)
 > on a given Copilot-served model.
 
-Scripts are runnable directly with Node.js. They are **not** unit tests —
-there is no assertion framework, just one-shot CAPI calls with pretty-printed
-output.
+Scripts are runnable directly with `bun run`. They are **not** `bun test`
+unit tests — there is no assertion framework, just one-shot CAPI calls with
+pretty-printed output.
 
 ## Layout
 
@@ -50,8 +50,8 @@ other families (`gemini/`, …).
 
 1. `.env` is populated with the same vars the proxy needs (`GITHUB_TOKEN`,
    `VSCODE_MACHINE_ID`, `EDITOR_DEVICE_ID`, optionally `COPILOT_CHAT_VERSION`
-   / `VSCODE_VERSION` / `GITHUB_API_VERSION` / `GHE_HOST`). Pass
-   `--env-file-if-exists=.env` as shown below to load `.env`.
+   / `VSCODE_VERSION` / `GITHUB_API_VERSION` / `GHE_HOST`). Bun auto-loads
+   `.env`.
 2. That's it — no proxy server, no input API key. The CAPI token is minted on
    the fly from the GitHub token.
 
@@ -67,29 +67,29 @@ other families (`gemini/`, …).
 ## Running a script
 
 ```sh
-node --env-file-if-exists=.env capi_tests/claude/server-tools/web-search.ts             # non-streaming
-node --env-file-if-exists=.env capi_tests/claude/server-tools/web-search.ts --stream    # SSE streaming
+bun run capi_tests/claude/server-tools/web-search.ts             # non-streaming
+bun run capi_tests/claude/server-tools/web-search.ts --stream    # SSE streaming
 
-node --env-file-if-exists=.env capi_tests/claude/server-tools/web-fetch.ts
-node --env-file-if-exists=.env capi_tests/claude/server-tools/web-fetch.ts --stream
+bun run capi_tests/claude/server-tools/web-fetch.ts
+bun run capi_tests/claude/server-tools/web-fetch.ts --stream
 
-node --env-file-if-exists=.env capi_tests/claude/server-tools/support-matrix.ts
-node --env-file-if-exists=.env capi_tests/claude/server-tools/support-matrix.ts --tool code_execution_20260120
-node --env-file-if-exists=.env capi_tests/claude/server-tools/support-matrix.ts --verbose
+bun run capi_tests/claude/server-tools/support-matrix.ts
+bun run capi_tests/claude/server-tools/support-matrix.ts --tool code_execution_20260120
+bun run capi_tests/claude/server-tools/support-matrix.ts --verbose
 
-node --env-file-if-exists=.env capi_tests/openai/server-tools/support-matrix.ts
-node --env-file-if-exists=.env capi_tests/openai/server-tools/support-matrix.ts --model gpt-5.4
-node --env-file-if-exists=.env capi_tests/openai/server-tools/support-matrix.ts --tool web_search
-node --env-file-if-exists=.env capi_tests/openai/server-tools/support-matrix.ts --verbose
+bun run capi_tests/openai/server-tools/support-matrix.ts
+bun run capi_tests/openai/server-tools/support-matrix.ts --model gpt-5.4
+bun run capi_tests/openai/server-tools/support-matrix.ts --tool web_search
+bun run capi_tests/openai/server-tools/support-matrix.ts --verbose
 
-node --env-file-if-exists=.env capi_tests/claude/structured-output/json-schema.ts             # non-streaming
-node --env-file-if-exists=.env capi_tests/claude/structured-output/json-schema.ts --stream    # SSE streaming
-node --env-file-if-exists=.env capi_tests/claude/structured-output/json-schema.ts --model claude-opus-4.7
+bun run capi_tests/claude/structured-output/json-schema.ts             # non-streaming
+bun run capi_tests/claude/structured-output/json-schema.ts --stream    # SSE streaming
+bun run capi_tests/claude/structured-output/json-schema.ts --model claude-opus-4.7
 
-node --env-file-if-exists=.env capi_tests/claude/beta-headers/support-matrix.ts                       # full model × header grid
-node --env-file-if-exists=.env capi_tests/claude/beta-headers/support-matrix.ts --model claude-opus-4.8
-node --env-file-if-exists=.env capi_tests/claude/beta-headers/support-matrix.ts --beta files-api-2025-04-14
-node --env-file-if-exists=.env capi_tests/claude/beta-headers/support-matrix.ts --verbose
+bun run capi_tests/claude/beta-headers/support-matrix.ts                       # full model × header grid
+bun run capi_tests/claude/beta-headers/support-matrix.ts --model claude-opus-4.8
+bun run capi_tests/claude/beta-headers/support-matrix.ts --beta files-api-2025-04-14
+bun run capi_tests/claude/beta-headers/support-matrix.ts --verbose
 ```
 
 Each probe prints, in order, the resolved CAPI URL, the model + tool +

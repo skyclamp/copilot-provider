@@ -16,9 +16,9 @@
  * and model aliasing in `src/` are irrelevant here.
  *
  * Usage:
- *   node --env-file-if-exists=.env capi_tests/claude/server-tools/support-matrix.ts
- *   node --env-file-if-exists=.env capi_tests/claude/server-tools/support-matrix.ts --tool code_execution_20260120
- *   node --env-file-if-exists=.env capi_tests/claude/server-tools/support-matrix.ts --verbose
+ *   bun run capi_tests/claude/server-tools/support-matrix.ts
+ *   bun run capi_tests/claude/server-tools/support-matrix.ts --tool code_execution_20260120
+ *   bun run capi_tests/claude/server-tools/support-matrix.ts --verbose
  */
 
 import { callCapiMessages } from '../../_lib/capi.ts';

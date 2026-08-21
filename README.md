@@ -1,6 +1,6 @@
 # copilot-provider
 
-A small Node.js/TypeScript proxy for GitHub Copilot CAPI, with no runtime dependencies.
+A small Bun/TypeScript proxy for GitHub Copilot CAPI.
 
 It exposes three endpoints:
 
@@ -13,12 +13,10 @@ device headers, forwards response bodies, and extracts usage from a tee'd
 response stream.
 
 ```sh
-npm install
-npm run setup-device
-npm run auth
-npm run gen-keys
-npm run build
-npm start
+bun run setup-device
+bun run auth
+bun run gen-keys
+bun run start
 ```
 
 See [docs/design.md](docs/design.md) for the request contract and
