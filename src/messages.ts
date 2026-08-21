@@ -1,5 +1,4 @@
 import { buildResponseHeaders, getProxyContext } from './proxy.ts';
-import { pipeAndExtractUsage, requestUsageExtras } from './usage.ts';
 import type { RequestContext } from './types.ts';
 
 export async function proxyMessages(ctx: RequestContext): Promise<Response> {
@@ -28,17 +27,7 @@ export async function proxyMessages(ctx: RequestContext): Promise<Response> {
       return new Response(errorBody, { status: upstream.status, headers: respHeaders });
     }
 
-    if (upstream.body) {
-      return pipeAndExtractUsage(upstream, respHeaders, {
-        endpoint: 'messages',
-        keyId: apiKeyId,
-        stream: false,
-        requestModel: null,
-        extras: requestUsageExtras(req),
-      });
-    }
-
-    return new Response(null, { status: upstream.status, headers: respHeaders });
+    return new Response(upstream.body, { status: upstream.status, headers: respHeaders });
   } catch (error) {
     console.error('[proxy] Error:', error);
     return new Response(

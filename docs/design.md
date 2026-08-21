@@ -26,8 +26,7 @@
 
 ## 流式转发
 
-当 `stream: true` 时，上游返回 `text/event-stream`。代理 tee 上游
-`ReadableStream`：一支直接返回客户端，另一支旁路解析 usage。
+当上游返回 `text/event-stream` 时，代理直接将上游 `ReadableStream` 返回客户端。
 
 ## 请求 Headers
 

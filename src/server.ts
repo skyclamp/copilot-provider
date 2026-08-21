@@ -1,7 +1,7 @@
 import { proxyChatCompletions } from './chat-completions.ts';
 import { proxyMessages } from './messages.ts';
 import { proxyResponses } from './responses.ts';
-import { resolveKeyId } from './usage.ts';
+import { resolveKeyId } from './keys.ts';
 import type { EndpointHandler, RequestContext } from './types.ts';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' } as const;

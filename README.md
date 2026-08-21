@@ -11,8 +11,8 @@ It exposes these endpoints:
 - `POST /chat/completions`
 
 Request bodies are passed through without being read or validated. The proxy
-adds the CAPI authentication and device headers, forwards response bodies, and
-extracts usage from a tee'd response stream.
+adds the CAPI authentication and device headers, and forwards response streams
+directly.
 
 ```sh
 bun run setup-device
