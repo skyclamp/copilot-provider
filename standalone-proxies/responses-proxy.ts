@@ -9,8 +9,8 @@ type CliOptions = {
   gheHost: string | null;
 };
 
-const VSCODE_MACHINE_ID = '';
-const EDITOR_DEVICE_ID = '';
+const VSCODE_MACHINE_ID = crypto.randomUUID();
+const EDITOR_DEVICE_ID = crypto.randomUUID();
 const GITHUB_API_VERSION = '2026-06-01';
 const VSCODE_VERSION = '1.134.0';
 const COPILOT_CHAT_VERSION = '0.63.0';
