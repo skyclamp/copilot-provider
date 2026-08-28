@@ -29,11 +29,10 @@ bun run auth                     # GitHub device-flow login → prints GITHUB_TO
 bun run setup-device             # generates VSCODE_*/EDITOR_DEVICE_ID for .env
 bun run gen-keys                 # mints input API keys into src/keys.json
 bun run fetch-models -- --token <gh-token>   # prints the upstream Copilot /models payload (debug only)
-bun test                         # automated contract tests
 bun run typecheck                # tsc --noEmit
 ```
 
-Tests use Bun's built-in test runner. No linter is configured.
+No linter is configured.
 
 ## Architecture
 

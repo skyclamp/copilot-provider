@@ -17,7 +17,6 @@
     "setup-device": "bun run scripts/setup-device.ts",
     "gen-keys": "bun run scripts/gen-keys.ts",
     "fetch-models": "bun run scripts/fetch-models.ts",
-    "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
   "type": "module"

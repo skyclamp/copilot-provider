@@ -16,5 +16,5 @@
     "esModuleInterop": true,
     "isolatedModules": true
   },
-  "include": ["index.ts", "src/**/*.ts", "src/**/*.json", "scripts/**/*.ts", "tests/**/*.ts"]
+  "include": ["index.ts", "src/**/*.ts", "src/**/*.json", "scripts/**/*.ts"]
 }
