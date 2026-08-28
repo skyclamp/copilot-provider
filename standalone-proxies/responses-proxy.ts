@@ -134,10 +134,14 @@ async function proxyResponses(req: Request): Promise<Response> {
   try {
     const token = await getCopilotToken();
     const apiBase = token.endpoints?.api?.replace(/\/+$/, '') || 'https://api.githubcopilot.com';
+    const body = await req.json() as Record<string, unknown>;
+    if (body.model === 'gpt-5.6-sol' && (body.service_tier === 'fast' || body.service_tier === 'priority')) {
+      body.model = 'gpt-5.6-sol-fast';
+    }
     const upstream = await fetch(`${apiBase}/responses`, {
       method: 'POST',
       headers: copilotHeaders(req, token.token),
-      body: req.body,
+      body: JSON.stringify(body),
     });
     const headers = responseHeaders(upstream);
     if (upstream.status !== 200) {

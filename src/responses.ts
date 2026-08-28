@@ -11,10 +11,14 @@ export async function proxyResponses(ctx: RequestContext): Promise<Response> {
 
     console.log(`[proxy] responses key=${apiKeyId}`);
 
+    const body = await req.json() as Record<string, unknown>;
+    if (body.model === 'gpt-5.6-sol' && (body.service_tier === 'fast' || body.service_tier === 'priority')) {
+      body.model = 'gpt-5.6-sol-fast';
+    }
     const upstream = await fetch(`${apiBase}/responses`, {
       method: 'POST',
       headers,
-      body: req.body,
+      body: JSON.stringify(body),
     });
 
     const respHeaders = buildResponseHeaders(upstream);
