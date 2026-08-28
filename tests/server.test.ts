@@ -121,6 +121,22 @@ describe('proxy request contract', () => {
     expect(calls[0]?.headers.has('anthropic-version')).toBe(false);
   });
 
+  test('removes service tier when switching to the fast model', async () => {
+    const before = calls.length;
+    const response = await request('/responses', JSON.stringify({
+      model: 'gpt-5.6-sol',
+      service_tier: 'fast',
+      input: 'ping',
+    }), { 'content-type': 'application/json' });
+
+    expect(response.status).toBe(200);
+    await response.text();
+    expect(JSON.parse(calls[before]!.body)).toEqual({
+      model: 'gpt-5.6-sol-fast',
+      input: 'ping',
+    });
+  });
+
   test('serves health checks and does not expose legacy v1 routes', async () => {
     const before = calls.length;
     for (const path of ['/', '/api/hello']) {

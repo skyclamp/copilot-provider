@@ -137,6 +137,7 @@ async function proxyResponses(req: Request): Promise<Response> {
     const body = await req.json() as Record<string, unknown>;
     if (body.model === 'gpt-5.6-sol' && (body.service_tier === 'fast' || body.service_tier === 'priority')) {
       body.model = 'gpt-5.6-sol-fast';
+      delete body.service_tier;
     }
     const upstream = await fetch(`${apiBase}/responses`, {
       method: 'POST',
