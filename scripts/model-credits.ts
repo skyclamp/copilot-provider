@@ -3,8 +3,8 @@
 export {};
 
 const DEFAULT_DATA_JSONS = [
-  '/Users/wenkai/tmp/modes.msa.json',
-  '/Users/wenkai/tmp/modes.aad.json',
+  '/Users/wenkai/tmp/models.msa.json',
+  '/Users/wenkai/tmp/models.aad.json',
 ];
 
 type Price = {
