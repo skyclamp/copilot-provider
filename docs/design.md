@@ -5,7 +5,8 @@
 三个 POST 端点不读取、不校验或修改 Request body，直接透传至 CAPI。CAPI 默认
 返回 usage，代理不添加 usage 请求字段。
 
-上游状态码和 response body 原样转发；代理自身故障返回 502。
+上游状态码原样转发；response body 除下述 Responses 流式 ID 归一化外原样转发。
+代理自身故障返回 502。
 
 ## 路由与上游路径映射
 
@@ -26,7 +27,13 @@
 
 ## 流式转发
 
-当上游返回 `text/event-stream` 时，代理直接将上游 `ReadableStream` 返回客户端。
+`/responses` 上游返回 `text/event-stream` 时，代理逐个解析 SSE 事件，按
+`output_index` 保留首次出现的输出项 ID，统一后续 `item.id`、`item_id` 和
+结束事件 `response.output` 中的 ID。每个请求独立记录，完整事件到达后立即转发；
+无需修改的事件保持原样。`call_id`、响应 ID 和加密 reasoning 内容保持原值。
+
+其余响应直接转发上游 `ReadableStream`。standalone Responses 代理内置相同的
+归一化逻辑，保持单文件运行。
 
 ## 请求 Headers
 

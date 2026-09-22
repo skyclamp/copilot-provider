@@ -1,4 +1,5 @@
 import { buildResponseHeaders, getProxyContext } from './proxy.ts';
+import { stabilizeResponseStream } from './responses-stream.ts';
 import type { RequestContext } from './types.ts';
 
 export async function proxyResponses(ctx: RequestContext): Promise<Response> {
@@ -30,7 +31,10 @@ export async function proxyResponses(ctx: RequestContext): Promise<Response> {
       return new Response(errorBody, { status: upstream.status, headers: respHeaders });
     }
 
-    return new Response(upstream.body, { status: upstream.status, headers: respHeaders });
+    const responseBody = upstream.body && upstream.headers.get('content-type')?.includes('text/event-stream')
+      ? stabilizeResponseStream(upstream.body)
+      : upstream.body;
+    return new Response(responseBody, { status: upstream.status, headers: respHeaders });
   } catch (error) {
     console.error('[proxy] Responses error:', error);
     return new Response(

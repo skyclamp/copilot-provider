@@ -12,7 +12,8 @@ It exposes these endpoints:
 
 Request bodies are passed through without being read or validated. The proxy
 adds the CAPI authentication and device headers, and forwards response streams
-directly.
+directly, except that `/responses` SSE output item IDs are kept stable per
+`output_index` throughout each response, including its terminal output array.
 
 ```sh
 bun run setup-device
@@ -31,7 +32,8 @@ The dependency-free, single-file Bun proxies in
 caller's API key or request body. They only add the Copilot authentication and
 device headers before forwarding the request:
 
-- [`responses-proxy.ts`](standalone-proxies/responses-proxy.ts) serves `POST /responses`.
+- [`responses-proxy.ts`](standalone-proxies/responses-proxy.ts) serves `POST /responses`
+  with the same SSE output item ID normalization built into the single file.
 - [`chat-completions-proxy.ts`](standalone-proxies/chat-completions-proxy.ts) serves
   `POST /chat/completions`.
 
