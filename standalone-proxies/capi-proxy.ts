@@ -266,7 +266,7 @@ async function proxyResponses(req: Request): Promise<Response> {
     const headers = responseHeaders(upstream);
     if (upstream.status !== 200) {
       const errorBody = await upstream.text();
-      console.error(`[responses-proxy] upstream ${upstream.status}: ${errorBody}`);
+      console.error(`Upstream ${upstream.status}: ${errorBody}`);
       return new Response(errorBody, { status: upstream.status, headers });
     }
     const responseBody = upstream.body && upstream.headers.get('content-type')?.includes('text/event-stream')
@@ -277,12 +277,40 @@ async function proxyResponses(req: Request): Promise<Response> {
       headers,
     });
   } catch (error) {
-    console.error('[standalone-responses] proxy error:', error);
-    return Response.json(
-      { type: 'error', error: { type: 'proxy_error', message: String(error) } },
-      { status: 502 },
-    );
+    return proxyError(error);
   }
+}
+
+async function proxyMessages(req: Request): Promise<Response> {
+  try {
+    const token = await getCopilotToken();
+    const apiBase = token.endpoints?.api?.replace(/\/+$/, '') || 'https://api.githubcopilot.com';
+    const headers = copilotHeaders(req, token.token);
+    const anthropicBeta = req.headers.get('anthropic-beta');
+    if (anthropicBeta) headers['anthropic-beta'] = anthropicBeta;
+    const upstream = await fetch(`${apiBase}/v1/messages`, {
+      method: 'POST',
+      headers,
+      body: req.body,
+    });
+    const respHeaders = responseHeaders(upstream);
+    if (!upstream.ok) {
+      const errorBody = await upstream.text();
+      console.error(`Upstream ${upstream.status}: ${errorBody}`);
+      return new Response(errorBody, { status: upstream.status, headers: respHeaders });
+    }
+    return new Response(upstream.body, { status: upstream.status, headers: respHeaders });
+  } catch (error) {
+    return proxyError(error);
+  }
+}
+
+function proxyError(error: unknown): Response {
+  console.error('proxy error:', error);
+  return Response.json(
+    { type: 'error', error: { type: 'proxy_error', message: String(error) } },
+    { status: 502 },
+  );
 }
 
 const server = Bun.serve({
@@ -296,6 +324,9 @@ const server = Bun.serve({
     if (req.method === 'POST' && pathname === '/responses') {
       return proxyResponses(req);
     }
+    if (req.method === 'POST' && pathname === '/v1/messages') {
+      return proxyMessages(req);
+    }
     return new Response('null', {
       status: 404,
       headers: { 'Content-Type': 'application/json' },
@@ -303,4 +334,4 @@ const server = Bun.serve({
   },
 });
 
-console.log(`[responses-proxy] listening on http://localhost:${server.port}`);
+console.log(`Listening on http://localhost:${server.port}`);

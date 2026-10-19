@@ -32,8 +32,9 @@ The dependency-free, single-file Bun proxies in
 caller's API key or request body. They only add the Copilot authentication and
 device headers before forwarding the request:
 
-- [`responses-proxy.ts`](standalone-proxies/responses-proxy.ts) serves `POST /responses`
-  with the same SSE output item ID normalization built into the single file.
+- [`messages-responses-proxy.ts`](standalone-proxies/messages-responses-proxy.ts) serves
+  `POST /v1/messages` and `POST /responses`, with the same Responses SSE output
+  item ID normalization built into the single file.
 - [`chat-completions-proxy.ts`](standalone-proxies/chat-completions-proxy.ts) serves
   `POST /chat/completions`.
 
@@ -41,7 +42,7 @@ In the chosen proxy file, replace `VSCODE_MACHINE_ID` and
 `EDITOR_DEVICE_ID` with your device values, then pass the GitHub token:
 
 ```sh
-bun standalone-proxies/responses-proxy.ts --github-token "$GITHUB_TOKEN"
+bun standalone-proxies/messages-responses-proxy.ts --github-token "$GITHUB_TOKEN"
 ```
 
 For GitHub Enterprise, add `--ghe-host ghe.example.com`. It also supports

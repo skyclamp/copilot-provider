@@ -32,7 +32,7 @@
 结束事件 `response.output` 中的 ID。每个请求独立记录，完整事件到达后立即转发；
 无需修改的事件保持原样。`call_id`、响应 ID 和加密 reasoning 内容保持原值。
 
-其余响应直接转发上游 `ReadableStream`。standalone Responses 代理内置相同的
+其余响应直接转发上游 `ReadableStream`。standalone Messages/Responses 代理内置相同的
 归一化逻辑，保持单文件运行。
 
 ## 请求 Headers
