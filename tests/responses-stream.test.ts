@@ -95,3 +95,29 @@ test('passes through payloads that are not Responses events', async () => {
   const result = await normalize(text);
   expect(result).toBe(text.replace('"item_id":"second"', '"item_id":"first"'));
 });
+
+test('normalizes a final event that ends at EOF without a blank line, without adding one', async () => {
+  const added = { type: 'response.output_item.added', output_index: 0, item: { id: 'first', type: 'message' } };
+  const completed = { type: 'response.completed', response: { id: 'r', output: [{ id: 'final', type: 'message' }] } };
+  const result = await normalize(event(added) + `data: ${JSON.stringify(completed)}`);
+  expect(result).toBe(event(added) + `data: ${JSON.stringify({ ...completed, response: { id: 'r', output: [added.item] } })}`);
+});
+
+test('dispatches an event as soon as its CR blank line arrives, like the SDK LineDecoder', async () => {
+  let controller!: ReadableStreamDefaultController<Uint8Array>;
+  const reader = stabilizeResponseStream(new ReadableStream<Uint8Array>({ start(value) { controller = value; } })).getReader();
+  const frame = 'data: {"type":"response.output_text.delta","output_index":0,"item_id":"a","delta":"x"}\r\n\r';
+  controller.enqueue(encoder.encode(frame));
+  expect(new TextDecoder().decode((await reader.read()).value)).toBe(frame);
+  controller.enqueue(encoder.encode('\n'));
+  controller.close();
+  expect(new TextDecoder().decode((await reader.read()).value)).toBe('\n');
+  expect((await reader.read()).done).toBe(true);
+});
+
+test('normalizes output in non-terminal lifecycle snapshots', async () => {
+  const added = { type: 'response.output_item.added', output_index: 0, item: { id: 'first', type: 'message' } };
+  const progress = { type: 'response.in_progress', response: { id: 'r', output: [{ id: 'rotated', type: 'message' }] } };
+  const result = parse(await normalize(event(added) + event(progress)));
+  expect(result[1]).toEqual({ ...progress, response: { id: 'r', output: [added.item] } });
+});

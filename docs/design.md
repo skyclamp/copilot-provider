@@ -2,7 +2,9 @@
 
 ## 透传原则
 
-三个 POST 端点不读取、不校验或修改 Request body，直接透传至 CAPI。CAPI 默认
+代理只服务 Responses API 客户端（Codex 的 gpt 模型、grok-build 的 grok 模型）。
+Request body 不做校验，只读取 `input` 计算 `X-Initiator`，以及把
+`gpt-5.6-sol` + `service_tier: fast|priority` 改写为 `gpt-5.6-sol-fast`。CAPI 默认
 返回 usage，代理不添加 usage 请求字段。
 
 上游状态码原样转发；response body 除 Responses 流式 ID 归一化（见下）外原样转发。
@@ -12,25 +14,27 @@
 
 | 代理端点 | 上游路径 |
 |----------|----------|
-| `POST /v1/messages` | `{api}/v1/messages` |
 | `POST /responses` | `{api}/responses` |
-| `POST /chat/completions` | `{api}/chat/completions` |
 | `HEAD /` | `200` |
-| `HEAD /api/hello` | `200` |
 
-`/responses` 和 `/chat/completions` 的上游路径无 `/v1` 前缀。
+`/responses` 的上游路径无 `/v1` 前缀。
 
 其他所有请求 → 404。
-
-`/v1/messages` 将 `anthropic-beta` header 原值透传，不向 CAPI 发送
-`anthropic-version`。
 
 ## 流式转发
 
 `/responses` 上游返回 `text/event-stream` 时，经 `src/responses-stream.ts` 归一化后转发：
-按 `output_index` 保留首次出现的输出项 ID，统一后续 `item.id`、`item_id` 和结束事件
-`response.output` 中的 ID。每个请求独立记录，完整事件到达后立即转发；无需修改的事件、
-非 JSON 或缺少 `type` 的 data 保持原样。`call_id`、响应 ID 和加密 reasoning 内容保持原值。
+按 `output_index` 保留首次出现的输出项 ID，统一后续 `item.id`、`item_id` 和生命周期事件
+（`response.created/queued/in_progress/completed/failed/incomplete`）`response.output` 中的 ID。
+每个请求独立记录，完整事件到达后立即转发；无需修改的事件（含注释、`event:` 行和原换行符）、
+非 JSON 或缺少 `type` 的 data 按原字节转发。`call_id`、响应 ID 和加密 reasoning 内容保持原值。
+
+SSE 解析照搬 openai-node（`src/internal/decoders/line.ts` 的 `LineDecoder`、
+`src/core/streaming.ts` 的 `SSEDecoder`）：支持 CR / LF / CRLF 及跨 chunk 拆分，行尾 CR
+立即结束该行；字段按第一个 `:` 切分并去掉值开头一个空格，多个 `data:` 以 `\n` 拼接；
+上游最后一个事件缺少空行时在 EOF 仍会处理，但不补写空行。ID 规则对应 SDK
+accumulator 的校验：`item_id` 必须等于 `output[output_index].id`，done 与 completed
+中的 ID 必须与 added 一致，否则官方 SDK 会直接抛错。
 
 **为什么必须归一化（2026-10 实测）**：CAPI 对同一输出项的每个事件都给出不同的不透明 ID
 （`output_item.added`、各个 delta、`output_item.done`、`response.completed` 各不相同，
@@ -58,14 +62,30 @@ Editor-Version: vscode/<VSCODE_VERSION>
 User-Agent: GitHubCopilotChat/<COPILOT_CHAT_VERSION>
 ```
 
-`/responses` 额外对齐 VS Code 内置 Responses 代理（见
+`/responses` 按客户端区分（`session.ts` 的 `requestProduct()`：session header 或 UA
+含 `grok-shell` / `xai-grok-build` 判定为 grok-build，其余按 Codex 处理）。
+
+Codex 对齐 VS Code 内置 Responses 代理（见
 [vscode-responses-proxy.md](vscode-responses-proxy.md)）：
 
 ```
 OpenAI-Intent: responses-proxy
 X-Interaction-Type: responses-proxy
-X-Initiator: user | agent       (input 末项为字符串或 role=user 的 message 时为 user)
 User-Agent: vscode_codex/<入站 UA 第一个 / 之后的部分>   (入站有 UA 时)
+```
+
+grok-build 对齐 VS Code 原生 Chat 的 agent 请求（CAPI 上 grok 模型只支持 `/responses`）：
+
+```
+OpenAI-Intent: conversation-agent
+X-Interaction-Type: conversation-agent
+User-Agent: GitHubCopilotChat/<COPILOT_CHAT_VERSION>   (不改写入站 UA)
+```
+
+两者共用：
+
+```
+X-Initiator: user | agent       (input 末项为字符串或 role=user 的 message 时为 user)
 Accept: <入站 Accept>
 ```
 

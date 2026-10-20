@@ -1,8 +1,10 @@
 import { buildResponseHeaders, getProxyContext } from './proxy.ts';
 import { stabilizeResponseStream } from './responses-stream.ts';
+import { requestProduct } from './session.ts';
 import type { RequestContext } from './types.ts';
 
-const INTENT = 'responses-proxy';
+const CODEX_INTENT = 'responses-proxy';
+const CHAT_INTENT = 'conversation-agent';
 
 function isUserInitiated(input: unknown): boolean {
   const last = Array.isArray(input) ? input.at(-1) : input;
@@ -24,12 +26,17 @@ export async function proxyResponses(ctx: RequestContext): Promise<Response> {
 
     const accept = req.headers.get('accept');
     if (accept) headers.Accept = accept;
-    const userAgent = req.headers.get('user-agent');
-    if (userAgent) headers['User-Agent'] = upstreamUserAgent(userAgent);
-    headers['OpenAI-Intent'] = INTENT;
-    headers['X-Interaction-Type'] = INTENT;
+    const product = requestProduct(req);
+    let intent = CHAT_INTENT;
+    if (product !== 'gb') {
+      const userAgent = req.headers.get('user-agent');
+      if (userAgent) headers['User-Agent'] = upstreamUserAgent(userAgent);
+      intent = CODEX_INTENT;
+    }
+    headers['OpenAI-Intent'] = intent;
+    headers['X-Interaction-Type'] = intent;
 
-    console.log(`[proxy] responses key=${apiKeyId}`);
+    console.log(`[proxy] responses key=${apiKeyId} client=${product}`);
 
     const body = await req.json() as Record<string, unknown>;
     if (body.model === 'gpt-5.6-sol' && (body.service_tier === 'fast' || body.service_tier === 'priority')) {

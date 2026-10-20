@@ -3,8 +3,6 @@ export type RequestContext = {
   apiKeyId: string;
 };
 
-export type EndpointHandler = (ctx: RequestContext) => Promise<Response>;
-
 export type CopilotTokenResponse = {
   token: string;
   expires_at: number;

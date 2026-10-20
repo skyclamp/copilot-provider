@@ -36,6 +36,10 @@ export function requestSessionIdentity(req: Request): SessionIdentity | null {
   return { header, prefix: prefixFromUserAgent(req), sessionId };
 }
 
+export function requestProduct(req: Request): ProductPrefix {
+  return requestSessionIdentity(req)?.prefix ?? prefixFromUserAgent(req);
+}
+
 const MAX_UPSTREAM_SESSIONS = 1000;
 
 function newVscodeSessionId(): string {

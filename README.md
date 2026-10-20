@@ -2,18 +2,16 @@
 
 A small Bun/TypeScript proxy for GitHub Copilot CAPI.
 
-It exposes these endpoints:
+It serves the Responses API for Codex (gpt models) and grok-build (grok
+models), and exposes only these endpoints:
 
 - `HEAD /`
-- `HEAD /api/hello`
-- `POST /v1/messages`
 - `POST /responses`
-- `POST /chat/completions`
 
-Request bodies are passed through without being read or validated. The proxy
-adds the CAPI authentication and device headers, and forwards response streams
-directly, except that `/responses` SSE output item IDs are kept stable per
-`output_index` throughout each response, including its terminal output array.
+Request bodies are not validated. The proxy adds the CAPI authentication and
+device headers, and forwards response streams directly, except that
+`/responses` SSE output item IDs are kept stable per `output_index` throughout
+each response, including its terminal output array.
 
 ```sh
 bun run setup-device
