@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-export type ProductPrefix = 'cc' | 'cx' | 'oc' | 'gb';
+export type ProductPrefix = 'cx' | 'gb';
 
 export type SessionIdentity = {
   header: string;
@@ -8,19 +8,18 @@ export type SessionIdentity = {
   sessionId: string;
 };
 
+// grok-build subagents get their own x-grok-session-id; the conv-group id is
+// shared with the root session, so it keys the upstream session like the
+// process-wide VScode-SessionId does for VS Code subagents.
 const KNOWN_SESSION_HEADERS: ReadonlyArray<readonly [string, ProductPrefix]> = [
-  ['x-claude-code-session-id', 'cc'],
+  ['x-grok-conv-group-id', 'gb'],
   ['x-grok-session-id', 'gb'],
-  ['x-opencode-session', 'oc'],
-  ['x-session-affinity', 'oc'],
   ['session-id', 'cx'],
 ];
 
 function prefixFromUserAgent(req: Request): ProductPrefix {
   const userAgent = req.headers.get('user-agent')?.toLowerCase() ?? '';
-  if (userAgent.includes('opencode')) return 'oc';
   if (userAgent.includes('grok-shell') || userAgent.includes('xai-grok-build')) return 'gb';
-  if (userAgent.includes('claude')) return 'cc';
   return 'cx';
 }
 
@@ -29,18 +28,28 @@ export function requestSessionIdentity(req: Request): SessionIdentity | null {
     const sessionId = req.headers.get(header)?.trim();
     if (sessionId) return { header, prefix, sessionId };
   }
-
-  const header = 'x-session-id';
-  const sessionId = req.headers.get(header)?.trim();
-  if (!sessionId) return null;
-  return { header, prefix: prefixFromUserAgent(req), sessionId };
+  return null;
 }
 
 export function requestProduct(req: Request): ProductPrefix {
   return requestSessionIdentity(req)?.prefix ?? prefixFromUserAgent(req);
 }
 
-const MAX_UPSTREAM_SESSIONS = 1000;
+const MAX_TRACKED_IDS = 1000;
+
+// Returns the id remembered for `key`, creating it on first use. The map is
+// kept in recency order and bounded, evicting the least recently used key.
+export function rememberId(map: Map<string, string>, key: string, create: () => string): string {
+  let id = map.get(key);
+  if (id !== undefined) {
+    map.delete(key);
+  } else {
+    id = create();
+    if (map.size >= MAX_TRACKED_IDS) map.delete(map.keys().next().value!);
+  }
+  map.set(key, id);
+  return id;
+}
 
 function newVscodeSessionId(): string {
   return `${randomUUID()}${Date.now()}`;
@@ -54,16 +63,9 @@ export function upstreamSessionId(req: Request | undefined): string {
   if (!identity) return processSessionId;
 
   const key = `${identity.prefix}:${identity.sessionId}`;
-  let sessionId = upstreamSessions.get(key);
-  if (sessionId) {
-    upstreamSessions.delete(key);
-  } else {
-    sessionId = newVscodeSessionId();
-    if (upstreamSessions.size >= MAX_UPSTREAM_SESSIONS) {
-      upstreamSessions.delete(upstreamSessions.keys().next().value!);
-    }
+  return rememberId(upstreamSessions, key, () => {
+    const sessionId = newVscodeSessionId();
     console.log(`[proxy] session ${key} -> ${sessionId}`);
-  }
-  upstreamSessions.set(key, sessionId);
-  return sessionId;
+    return sessionId;
+  });
 }

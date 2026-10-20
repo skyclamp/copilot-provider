@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
  * Standalone Copilot models fetcher.
  *
@@ -7,7 +7,7 @@
  * printed for debugging with --include-token-response.
  *
  * Usage:
- *   bun run scripts/fetch-models.ts --token <github-token> [OPTIONS]
+ *   npm run fetch-models -- --token <capi-token> [OPTIONS]
  */
 
 import { randomUUID } from 'node:crypto';
@@ -19,7 +19,7 @@ import {
   DEFAULT_COPILOT_API_BASE_URL,
 } from '../src/constants.ts';
 
-const MODELS_API_VERSION = Bun.env.MODELS_API_VERSION || '2026-06-01';
+const MODELS_API_VERSION = process.env.MODELS_API_VERSION || '2026-06-01';
 
 type Args = {
   token: string | null;
@@ -31,9 +31,9 @@ type Args = {
 
 function parseArgs(argv: string[]): Args {
   const args: Args = {
-    token: Bun.env.GITHUB_TOKEN || null,
-    gheHost: Bun.env.GHE_HOST
-      ? Bun.env.GHE_HOST.replace(/^https?:\/\//, '').replace(/\/+$/, '')
+    token: process.env.CAPI_TOKEN || null,
+    gheHost: process.env.CAPI_GHE_HOST
+      ? process.env.CAPI_GHE_HOST.replace(/^https?:\/\//, '').replace(/\/+$/, '')
       : null,
     copilotApiBaseUrl: null,
     includeTokenResponse: false,
@@ -44,9 +44,9 @@ function parseArgs(argv: string[]): Args {
     const a = argv[i];
     if (a === '-h' || a === '--help') {
       args.help = true;
-    } else if ((a === '--token' || a === '--github-token') && i + 1 < argv.length) {
+    } else if ((a === '--token' || a === '--capi-token') && i + 1 < argv.length) {
       args.token = argv[++i];
-    } else if ((a === '--ghe-host' || a === '--enterprise-host') && i + 1 < argv.length) {
+    } else if ((a === '--capi-ghe-host' || a === '--enterprise-host') && i + 1 < argv.length) {
       args.gheHost = argv[++i].replace(/^https?:\/\//, '').replace(/\/+$/, '');
     } else if (a === '--copilot-api-base-url' && i + 1 < argv.length) {
       args.copilotApiBaseUrl = argv[++i].replace(/\/+$/, '');
@@ -62,15 +62,15 @@ function parseArgs(argv: string[]): Args {
 
 function printHelp(): void {
   console.log([
-    'Usage: bun run scripts/fetch-models.ts --token <github-token> [OPTIONS]',
+    'Usage: npm run fetch-models -- --token <capi-token> [OPTIONS]',
     '',
     'Exchanges a GitHub access token for a Copilot token, then calls the',
     'Copilot /models endpoint and prints its response as JSON.',
     '',
     'Options:',
-    '  --token <token>             GitHub access token (or set GITHUB_TOKEN env).',
-    '  --github-token <token>      Alias of --token.',
-    '  --ghe-host <host>           GitHub Enterprise host (e.g. github.enterprise.com).',
+    '  --token <token>             GitHub access token for CAPI (or set CAPI_TOKEN env).',
+    '  --capi-token <token>        Alias of --token.',
+    '  --capi-ghe-host <host>      GitHub Enterprise host (e.g. github.enterprise.com; or set CAPI_GHE_HOST).',
     '                              Omit for github.com.',
     '  --copilot-api-base-url <url>',
     '                              Override the Copilot API base URL.',
@@ -85,8 +85,8 @@ function getGitHubApiBaseUrl(gheHost: string | null): string {
 }
 
 function getEditorVersions(): { editorVersion: string; editorPluginVersion: string } {
-  const chatVersion = Bun.env.COPILOT_CHAT_VERSION || '0.41.2';
-  const vscodeVersion = Bun.env.VSCODE_VERSION || '1.113.0';
+  const chatVersion = process.env.COPILOT_CHAT_VERSION || '0.41.2';
+  const vscodeVersion = process.env.VSCODE_VERSION || '1.113.0';
   return {
     editorVersion: `vscode/${vscodeVersion}`,
     editorPluginVersion: `copilot-chat/${chatVersion}`,
@@ -97,7 +97,6 @@ function tokenExchangeHeaders(githubToken: string): Record<string, string> {
   return {
     Authorization: `token ${githubToken}`,
     'X-GitHub-Api-Version': TOKEN_API_VERSION,
-    'Editor-Device-Id': Bun.env.EDITOR_DEVICE_ID || '',
   };
 }
 
@@ -177,7 +176,7 @@ if (args.help) {
 }
 
 if (!args.token) {
-  console.error('Missing GitHub token. Pass --token <token> or set GITHUB_TOKEN.');
+  console.error('Missing GitHub token. Pass --token <token> or set CAPI_TOKEN.');
   printHelp();
   process.exit(2);
 }

@@ -1,8 +1,8 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
- * GitHub Device Flow OAuth — prints GITHUB_TOKEN for .env
+ * GitHub Device Flow OAuth — prints CAPI_TOKEN for .env
  *
- * Usage: bun run scripts/auth.ts
+ * Usage: npm run auth
  */
 
 import {
@@ -113,4 +113,4 @@ console.log('\nWaiting for authorization...');
 const accessToken = await pollForToken(flow.device_code, flow.interval, flow.expires_in);
 
 console.log('\n# GitHub token (paste into .env)');
-console.log(`GITHUB_TOKEN=${accessToken.trim()}`);
+console.log(`CAPI_TOKEN=${accessToken.trim()}`);

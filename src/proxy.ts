@@ -14,10 +14,10 @@ type DeviceInfo = {
 };
 
 function getDeviceInfo(): DeviceInfo {
-  const vscodeMachineId = Bun.env.VSCODE_MACHINE_ID;
-  const editorDeviceId = Bun.env.EDITOR_DEVICE_ID;
+  const vscodeMachineId = process.env.VSCODE_MACHINE_ID;
+  const editorDeviceId = process.env.EDITOR_DEVICE_ID;
   if (!vscodeMachineId || !editorDeviceId) {
-    throw new Error('Device env vars not set. Run: bun run setup-device');
+    throw new Error('Device env vars not set. Run: npm run setup-device');
   }
   return { vscodeMachineId, editorDeviceId };
 }
@@ -27,9 +27,9 @@ function buildHeaders(
   device: DeviceInfo,
   sessionId: string,
 ): Record<string, string> {
-  const chatVersion = Bun.env.COPILOT_CHAT_VERSION || '0.70.0';
-  const vscodeVersion = Bun.env.VSCODE_VERSION || '1.142.0';
-  const apiVersion = Bun.env.GITHUB_API_VERSION || '2026-08-01';
+  const chatVersion = process.env.COPILOT_CHAT_VERSION || '0.70.0';
+  const vscodeVersion = process.env.VSCODE_VERSION || '1.142.0';
+  const apiVersion = process.env.GITHUB_API_VERSION || '2026-08-01';
   const requestId = randomUUID();
 
   const headers: Record<string, string> = {
@@ -56,6 +56,11 @@ export async function getProxyContext(req?: Request): Promise<ProxyContext> {
     apiBase: getCopilotApiBaseUrl(tokenResponse),
     headers: buildHeaders(tokenResponse.token, device, upstreamSessionId(req)),
   };
+}
+
+export function describeError(error: unknown): string {
+  const cause = error instanceof Error && error.cause ? `: ${String(error.cause)}` : '';
+  return `${String(error)}${cause}`;
 }
 
 export function buildResponseHeaders(upstream: Response): Headers {

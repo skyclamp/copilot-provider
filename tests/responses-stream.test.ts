@@ -1,5 +1,6 @@
-import { expect, test } from 'bun:test';
-import { stabilizeResponseStream } from '../src/responses-stream';
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { stabilizeResponseStream } from '../src/responses-stream.ts';
 
 const encoder = new TextEncoder();
 const event = (data: unknown) => `data: ${JSON.stringify(data)}\n\n`;
@@ -31,11 +32,11 @@ test('stabilizes each output item through deltas and all terminal events', async
     const result = parse(await normalize(events.map(event).join('') + event(terminal)));
 
     items.forEach((item, i) => {
-      expect(result[i * 3]).toEqual(events[i * 3]);
-      expect(result[i * 3 + 1]).toEqual({ ...events[i * 3 + 1], item_id: item.id });
-      expect(result[i * 3 + 2]).toEqual({ type: 'response.output_item.done', output_index: i, item });
+      assert.deepStrictEqual(result[i * 3], events[i * 3]);
+      assert.deepStrictEqual(result[i * 3 + 1], { ...events[i * 3 + 1], item_id: item.id });
+      assert.deepStrictEqual(result[i * 3 + 2], { type: 'response.output_item.done', output_index: i, item });
     });
-    expect(result.at(-1)).toEqual({ ...terminal, response: { id: 'response-original', output: items } });
+    assert.deepStrictEqual(result.at(-1), { ...terminal, response: { id: 'response-original', output: items } });
   }
 });
 
@@ -49,7 +50,7 @@ test('can learn the first ID from item_id and keeps response state independent',
     return { id, events, result: parse(await normalize(events.map(event).join(''))) };
   }));
   for (const { id, events, result } of results) {
-    expect(result).toEqual([events[0], { ...events[1], item: { id, type: 'message' } }]);
+    assert.deepStrictEqual(result, [events[0], { ...events[1], item: { id, type: 'message' } }]);
   }
 });
 
@@ -66,10 +67,10 @@ test('decodes split UTF-8 and multiline SSE incrementally, preserving unchanged 
   let received = '';
   while (received.length < first.length) {
     const { value, done } = await reader.read();
-    expect(done).toBe(false);
+    assert.strictEqual(done, false);
     received += decoder.decode(value, { stream: true });
   }
-  expect(received).toBe(first);
+  assert.strictEqual(received, first);
 
   const changed = { type: 'response.output_text.delta', output_index: 0, item_id: 'changed', delta: '世界' };
   const metadata = 'event: response.output_text.delta\r: keep this comment\r';
@@ -85,7 +86,7 @@ test('decodes split UTF-8 and multiline SSE incrementally, preserving unchanged 
     rest += decoder.decode(value, { stream: true });
   }
   rest += decoder.decode();
-  expect(rest).toBe(metadata + `data: ${JSON.stringify({ ...changed, item_id: 'first' })}\r\r` + 'data: [DONE]\n\n');
+  assert.strictEqual(rest, metadata + `data: ${JSON.stringify({ ...changed, item_id: 'first' })}\r\r` + 'data: [DONE]\n\n');
 });
 
 test('passes through payloads that are not Responses events', async () => {
@@ -93,14 +94,14 @@ test('passes through payloads that are not Responses events', async () => {
     + event({ type: 'response.output_text.delta', output_index: 0, item_id: 'first', delta: 'a' })
     + event({ type: 'response.output_text.delta', output_index: 0, item_id: 'second', delta: 'b' });
   const result = await normalize(text);
-  expect(result).toBe(text.replace('"item_id":"second"', '"item_id":"first"'));
+  assert.strictEqual(result, text.replace('"item_id":"second"', '"item_id":"first"'));
 });
 
 test('normalizes a final event that ends at EOF without a blank line, without adding one', async () => {
   const added = { type: 'response.output_item.added', output_index: 0, item: { id: 'first', type: 'message' } };
   const completed = { type: 'response.completed', response: { id: 'r', output: [{ id: 'final', type: 'message' }] } };
   const result = await normalize(event(added) + `data: ${JSON.stringify(completed)}`);
-  expect(result).toBe(event(added) + `data: ${JSON.stringify({ ...completed, response: { id: 'r', output: [added.item] } })}`);
+  assert.strictEqual(result, event(added) + `data: ${JSON.stringify({ ...completed, response: { id: 'r', output: [added.item] } })}`);
 });
 
 test('dispatches an event as soon as its CR blank line arrives, like the SDK LineDecoder', async () => {
@@ -108,16 +109,16 @@ test('dispatches an event as soon as its CR blank line arrives, like the SDK Lin
   const reader = stabilizeResponseStream(new ReadableStream<Uint8Array>({ start(value) { controller = value; } })).getReader();
   const frame = 'data: {"type":"response.output_text.delta","output_index":0,"item_id":"a","delta":"x"}\r\n\r';
   controller.enqueue(encoder.encode(frame));
-  expect(new TextDecoder().decode((await reader.read()).value)).toBe(frame);
+  assert.strictEqual(new TextDecoder().decode((await reader.read()).value), frame);
   controller.enqueue(encoder.encode('\n'));
   controller.close();
-  expect(new TextDecoder().decode((await reader.read()).value)).toBe('\n');
-  expect((await reader.read()).done).toBe(true);
+  assert.strictEqual(new TextDecoder().decode((await reader.read()).value), '\n');
+  assert.strictEqual((await reader.read()).done, true);
 });
 
 test('normalizes output in non-terminal lifecycle snapshots', async () => {
   const added = { type: 'response.output_item.added', output_index: 0, item: { id: 'first', type: 'message' } };
   const progress = { type: 'response.in_progress', response: { id: 'r', output: [{ id: 'rotated', type: 'message' }] } };
   const result = parse(await normalize(event(added) + event(progress)));
-  expect(result[1]).toEqual({ ...progress, response: { id: 'r', output: [added.item] } });
+  assert.deepStrictEqual(result[1], { ...progress, response: { id: 'r', output: [added.item] } });
 });

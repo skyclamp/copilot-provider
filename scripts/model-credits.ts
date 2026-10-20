@@ -1,6 +1,6 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 
-export {};
+import { readFile } from 'node:fs/promises';
 
 const DEFAULT_DATA_JSONS = [
   '/Users/wenkai/tmp/models.msa.json',
@@ -48,7 +48,7 @@ const dataJsonPaths = requestedPaths.length > 0 ? requestedPaths : DEFAULT_DATA_
 for (const [index, dataJsonPath] of dataJsonPaths.entries()) {
   if (index > 0) console.log();
   console.log(`Data JSON: ${dataJsonPath}`);
-  const response = (await Bun.file(dataJsonPath).json()) as ModelsResponse;
+  const response = JSON.parse(await readFile(dataJsonPath, 'utf8')) as ModelsResponse;
   const rows = response.data
     .filter(model => model.model_picker_enabled === true)
     .sort((a, b) =>

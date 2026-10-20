@@ -43,7 +43,7 @@ delta 挂在该 ID 上，`output_item.done` 时以 done 事件的 ID 发出 item
 导致 started 的项永远不完成、completed 的项没有开始。Codex 回放历史时会剥离不含 `_` 前缀的
 ID，CAPI 也接受"added 的 ID + done 的 encrypted_content"组合回放，所以归一化不影响回放。
 
-其余响应直接转发上游 `ReadableStream`。standalone 代理内置相同的归一化逻辑，保持单文件运行。
+其余响应直接转发上游 `ReadableStream`。
 
 ## 请求 Headers
 
@@ -74,20 +74,29 @@ X-Interaction-Type: responses-proxy
 User-Agent: vscode_codex/<入站 UA 第一个 / 之后的部分>   (入站有 UA 时)
 ```
 
-grok-build 对齐 VS Code 原生 Chat 的 agent 请求（CAPI 上 grok 模型只支持 `/responses`）：
+grok-build 对齐 VS Code 原生 Chat 的请求（CAPI 上 grok 模型只支持 `/responses`），
+`User-Agent` 用 `GitHubCopilotChat/<COPILOT_CHAT_VERSION>`，不改写入站 UA。grok-build 没有
+subagent header，`src/grok.ts` 从 `x-grok-*` 推断请求类型：
 
-```
-OpenAI-Intent: conversation-agent
-X-Interaction-Type: conversation-agent
-User-Agent: GitHubCopilotChat/<COPILOT_CHAT_VERSION>   (不改写入站 UA)
-```
+| 类型 | 判定 | `OpenAI-Intent` | `X-Interaction-Type` | `X-Request-Id` |
+|---|---|---|---|---|
+| main | 根会话、`conv-id == session-id`、`req-id` 为 prompt id | `conversation-agent` | `conversation-agent` | 按 `session-id:req-id` 固定（一个用户回合一个） |
+| subagent | `uuidv5(OID, "xai:grok-build:conversation-group:" + session-id) ≠ conv-group-id` | `conversation-agent` | `conversation-subagent` | 按 `session-id:req-id` 固定 |
+| compaction | `req-id` 以 `xai-compact-` 开头 | `conversation-agent` | `conversation-compaction` | 每次新生成 |
+| background | `conv-id ≠ session-id`、其他 `xai-` 前缀 `req-id` 或空 `req-id`（标题、分类器、memory、goal evaluator） | `conversation-panel` | `conversation-background` | 每次新生成 |
 
-两者共用：
+- `X-Initiator`：仅 main、`req-id` 为纯 UUID（非 `goal-summary-` 等系统发起前缀）、非重试
+  （`x-grok-transient-retry`）且 `input` 末项为 user 消息时为 `user`，其余为 `agent`。
+- `X-Interaction-Id`：按 `conv-group-id` 记录，每个 `user` 请求开始新的 interaction，同组的
+  subagent 和后台调用沿用。
+- 上游 session 按 `x-grok-conv-group-id` 映射（缺失时用 `x-grok-session-id`），根会话和它的
+  subagent 共用同一个 `VScode-SessionId`，对应 VS Code 中 subagent 共用进程级 session id。
 
-```
-X-Initiator: user | agent       (input 末项为字符串或 role=user 的 message 时为 user)
-Accept: <入站 Accept>
-```
+Codex 的 `session-id` 对 subagent 本来就是根会话 id；Codex 侧不读 `x-openai-subagent`，与
+VS Code 内置 Responses 代理一致。
+
+Codex 的 `X-Initiator`：`input` 末项为字符串或 role=user 的 message 时为 `user`，否则为 `agent`
+（同 VS Code 内置代理）。两者都透传入站 `Accept`。
 
 不发送 `Copilot-Integration-Id`。
 
@@ -96,6 +105,8 @@ Accept: <入站 Accept>
 客户端的 session id 不直接发给 CAPI。`src/session.ts` 在内存中维护
 `<产品前缀>:<客户端 session id>` → 上游 session id 的 map：
 
+- 识别的 header：Codex `session-id`（前缀 `cx`）；grok-build `x-grok-conv-group-id`，缺失时
+  `x-grok-session-id`（前缀 `gb`）。
 - 上游 id 按 VS Code `vscode.env.sessionId` 的格式生成：`<uuid><Date.now()>`。
 - 同一客户端会话始终映射到同一个上游 id；首次映射时打印一行 `[proxy] session` 日志。
 - 请求不带可识别的 session header 时，使用进程启动时生成的默认上游 id。

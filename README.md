@@ -1,6 +1,6 @@
 # copilot-provider
 
-A small Bun/TypeScript proxy for GitHub Copilot CAPI.
+A small Node.js/TypeScript proxy for GitHub Copilot CAPI.
 
 It serves the Responses API for Codex (gpt models) and grok-build (grok
 models), and exposes only these endpoints:
@@ -13,36 +13,25 @@ device headers, and forwards response streams directly, except that
 `/responses` SSE output item IDs are kept stable per `output_index` throughout
 each response, including its terminal output array.
 
+Requires Node.js >= 24.
+
 ```sh
-bun run setup-device
-bun run auth
-bun run gen-keys
-bun run start
+npm install
+npm run build          # tsc → dist/
+npm run setup-device   # prints VSCODE_MACHINE_ID / EDITOR_DEVICE_ID for .env
+npm run auth           # GitHub device flow → prints CAPI_TOKEN for .env
+npm run gen-keys       # writes client API keys to keys.json
+npm start              # node dist/index.js on $PORT (default 4141)
+```
+
+The CAPI token and GitHub Enterprise host can come from the environment
+(`CAPI_TOKEN`, `CAPI_GHE_HOST`) or from command-line arguments, which take
+precedence. They are deliberately not `GITHUB_TOKEN` / `GH_TOKEN`, which other
+tools pick up as a general-purpose GitHub PAT:
+
+```sh
+node --env-file-if-exists=.env dist/index.js --capi-token "$TOKEN" --capi-ghe-host ghe.example.com --port 4141
 ```
 
 See [docs/design.md](docs/design.md) for the request contract and
 [.env.example](.env.example) for configuration.
-
-## Standalone proxies
-
-The dependency-free, single-file Bun proxies in
-[`standalone-proxies/`](standalone-proxies/) do not read or validate the
-caller's API key or request body. They only add the Copilot authentication and
-device headers before forwarding the request:
-
-- [`messages-responses-proxy.ts`](standalone-proxies/messages-responses-proxy.ts) serves
-  `POST /v1/messages` and `POST /responses`, with the same Responses SSE output
-  item ID normalization built into the single file.
-- [`chat-completions-proxy.ts`](standalone-proxies/chat-completions-proxy.ts) serves
-  `POST /chat/completions`.
-
-In the chosen proxy file, replace `VSCODE_MACHINE_ID` and
-`EDITOR_DEVICE_ID` with your device values, then pass the GitHub token:
-
-```sh
-bun standalone-proxies/messages-responses-proxy.ts --github-token "$GITHUB_TOKEN"
-```
-
-For GitHub Enterprise, add `--ghe-host ghe.example.com`. It also supports
-`HEAD /` and `HEAD /api/hello`. The API version, VS Code version, and Copilot
-plugin version are constants in each file. `PORT` remains optional.
