@@ -12,10 +12,10 @@ test('standalone proxy serves Messages and normalizes Responses SSE without loca
   let upstream = new Response(sse, { headers: { 'Content-Type': 'text/event-stream' } });
   let upstreamRequest!: { url: string; init: RequestInit };
   let handle!: (req: Request) => Promise<Response>;
-  const source = await Bun.file(new URL('../standalone-proxies/messages-responses-proxy.ts', import.meta.url)).text();
+  const source = await Bun.file(new URL('../standalone-proxies/capi-proxy.ts', import.meta.url)).text();
   runInNewContext(new Bun.Transpiler({ loader: 'ts' }).transformSync(source), {
     Bun: {
-      argv: ['bun', 'messages-responses-proxy.ts', '--github-token', 'test-token'],
+      argv: ['bun', 'capi-proxy.ts', '--github-token', 'test-token'],
       env: {},
       serve(options: { fetch: typeof handle }) {
         handle = options.fetch;

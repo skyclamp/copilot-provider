@@ -2,6 +2,21 @@ import { buildResponseHeaders, getProxyContext } from './proxy.ts';
 import { stabilizeResponseStream } from './responses-stream.ts';
 import type { RequestContext } from './types.ts';
 
+const INTENT = 'responses-proxy';
+
+function isUserInitiated(input: unknown): boolean {
+  const last = Array.isArray(input) ? input.at(-1) : input;
+  if (typeof last === 'string') return true;
+  if (!last || typeof last !== 'object') return false;
+  const item = last as { type?: unknown; role?: unknown };
+  return (item.type === undefined || item.type === 'message') && item.role === 'user';
+}
+
+function upstreamUserAgent(userAgent: string): string {
+  const slash = userAgent.indexOf('/');
+  return slash === -1 ? `vscode_codex/${userAgent}` : `vscode_codex${userAgent.slice(slash)}`;
+}
+
 export async function proxyResponses(ctx: RequestContext): Promise<Response> {
   try {
     const { req, apiKeyId } = ctx;
@@ -9,6 +24,10 @@ export async function proxyResponses(ctx: RequestContext): Promise<Response> {
 
     const accept = req.headers.get('accept');
     if (accept) headers.Accept = accept;
+    const userAgent = req.headers.get('user-agent');
+    if (userAgent) headers['User-Agent'] = upstreamUserAgent(userAgent);
+    headers['OpenAI-Intent'] = INTENT;
+    headers['X-Interaction-Type'] = INTENT;
 
     console.log(`[proxy] responses key=${apiKeyId}`);
 
@@ -17,6 +36,7 @@ export async function proxyResponses(ctx: RequestContext): Promise<Response> {
       body.model = 'gpt-5.6-sol-fast';
       delete body.service_tier;
     }
+    headers['X-Initiator'] = isUserInitiated(body.input) ? 'user' : 'agent';
     const upstream = await fetch(`${apiBase}/responses`, {
       method: 'POST',
       headers,

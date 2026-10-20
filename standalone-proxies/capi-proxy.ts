@@ -159,7 +159,13 @@ function stabilizeResponseStream(source: ReadableStream<Uint8Array>): ReadableSt
     const raw = eventLines.join('');
     const payload = data.join('\n');
     if (!payload || payload === '[DONE]') return raw;
-    const event: ResponseEvent = JSON.parse(payload);
+    let event: ResponseEvent;
+    try {
+      event = JSON.parse(payload);
+    } catch {
+      return raw;
+    }
+    if (typeof event?.type !== 'string') return raw;
     let changed = false;
 
     function normalizeItem(index: number | undefined, item: OutputItem) {

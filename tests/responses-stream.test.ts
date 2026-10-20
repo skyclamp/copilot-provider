@@ -87,3 +87,11 @@ test('decodes split UTF-8 and multiline SSE incrementally, preserving unchanged 
   rest += decoder.decode();
   expect(rest).toBe(metadata + `data: ${JSON.stringify({ ...changed, item_id: 'first' })}\r\r` + 'data: [DONE]\n\n');
 });
+
+test('passes through payloads that are not Responses events', async () => {
+  const text = 'data: not json\n\n' + 'data: {"no_type":true,"output_index":0,"item_id":"x"}\n\n' + 'data: null\n\n'
+    + event({ type: 'response.output_text.delta', output_index: 0, item_id: 'first', delta: 'a' })
+    + event({ type: 'response.output_text.delta', output_index: 0, item_id: 'second', delta: 'b' });
+  const result = await normalize(text);
+  expect(result).toBe(text.replace('"item_id":"second"', '"item_id":"first"'));
+});

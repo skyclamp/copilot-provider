@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 export type ProductPrefix = 'cc' | 'cx' | 'oc' | 'gb';
 
 export type SessionIdentity = {
@@ -32,4 +34,32 @@ export function requestSessionIdentity(req: Request): SessionIdentity | null {
   const sessionId = req.headers.get(header)?.trim();
   if (!sessionId) return null;
   return { header, prefix: prefixFromUserAgent(req), sessionId };
+}
+
+const MAX_UPSTREAM_SESSIONS = 1000;
+
+function newVscodeSessionId(): string {
+  return `${randomUUID()}${Date.now()}`;
+}
+
+const processSessionId = newVscodeSessionId();
+const upstreamSessions = new Map<string, string>();
+
+export function upstreamSessionId(req: Request | undefined): string {
+  const identity = req ? requestSessionIdentity(req) : null;
+  if (!identity) return processSessionId;
+
+  const key = `${identity.prefix}:${identity.sessionId}`;
+  let sessionId = upstreamSessions.get(key);
+  if (sessionId) {
+    upstreamSessions.delete(key);
+  } else {
+    sessionId = newVscodeSessionId();
+    if (upstreamSessions.size >= MAX_UPSTREAM_SESSIONS) {
+      upstreamSessions.delete(upstreamSessions.keys().next().value!);
+    }
+    console.log(`[proxy] session ${key} -> ${sessionId}`);
+  }
+  upstreamSessions.set(key, sessionId);
+  return sessionId;
 }
