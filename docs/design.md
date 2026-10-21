@@ -15,7 +15,7 @@ Request body 不做校验，只读取 `input` 计算 `X-Initiator`，以及把
 | 代理端点 | 上游路径 |
 |----------|----------|
 | `POST /responses` | `{api}/responses` |
-| `HEAD /` | `200` |
+| `GET /`、`HEAD /` | `200`（健康检查；grok-build 会话启动时用 `GET /` 预热连接） |
 
 `/responses` 的上游路径无 `/v1` 前缀。
 

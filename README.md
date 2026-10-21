@@ -5,7 +5,7 @@ A small Node.js/TypeScript proxy for GitHub Copilot CAPI.
 It serves the Responses API for Codex (gpt models) and grok-build (grok
 models), and exposes only these endpoints:
 
-- `HEAD /`
+- `GET /` and `HEAD /` (health check; grok-build prewarms with `GET /`)
 - `POST /responses`
 
 Request bodies are not validated. The proxy adds the CAPI authentication and

@@ -104,7 +104,9 @@ const app = express();
 app.disable('x-powered-by');
 app.set('etag', false);
 
-app.head('/', (_req, res) => {
+// Also answers HEAD. grok-build prewarms the connection with an
+// unauthenticated `GET /` on the base URL's origin when a session starts.
+app.get('/', (_req, res) => {
   res.status(200).end();
 });
 app.post('/responses', route(handleResponses));

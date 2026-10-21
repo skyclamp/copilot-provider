@@ -45,7 +45,7 @@ Entry point [index.ts](index.ts) parses CLI arguments (`--capi-token`,
 starts the Express app exported by [src/server.ts](src/server.ts). The server
 only exposes:
 
-- `HEAD /` — health check
+- `GET /`, `HEAD /` — health check (grok-build prewarms its connection with `GET /`)
 - `POST /responses` → upstream `{api}/responses` ([src/responses.ts](src/responses.ts))
 
 Anything else returns `404 null`. See [docs/design.md](docs/design.md) for
